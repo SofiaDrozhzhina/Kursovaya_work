@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Мои курсы{% endblock %}
+{% block page_title %}📖 Мои курсы{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header"><div class="table-title">{% if user.role=='teacher' %}Курсы, которые я веду{% else %}Мои записи на курсы{% endif %}</div></div>
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          {% if user.role == 'teacher' %}
+          <th>Название</th><th>Описание</th><th>Записано</th><th>Макс.</th><th>Ср. балл</th>
+          {% else %}
+          <th>Курс</th><th>Преподаватель</th><th>Статус</th><th>Оценка</th><th>Дата записи</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          {% if user.role == 'teacher' %}
+          <td><strong>{{ r.title }}</strong></td>
+          <td class="td-sub">{{ (r.description or '')[:60] }}{% if r.description and r.description|length>60 %}…{% endif %}</td>
+          <td><span class="badge badge-blue">{{ r.enrolled }}</span></td>
+          <td class="td-sub">{{ r.max_students }}</td>
+          <td>{{ r.avg_grade if r.avg_grade else '—' }}</td>
+          {% else %}
+          <td><strong>{{ r.course }}</strong></td>
+          <td>{{ r.teacher or '—' }}</td>
+          <td>
+            {% if r.status=='completed' %}<span class="badge badge-green">Завершён</span>
+            {% elif r.status=='active' %}<span class="badge badge-blue">Активен</span>
+            {% else %}<span class="badge badge-gray">{{ r.status }}</span>{% endif %}
+          </td>
+          <td>
+            {% if r.grade is not none %}
+            <strong style="color:{% if r.grade>=75 %}var(--green){% elif r.grade>=60 %}var(--yellow){% else %}var(--red){% endif %}">{{ r.grade }}</strong>
+            {% else %}—{% endif %}
+          </td>
+          <td class="td-sub">{{ r.enrolled_at.strftime('%d.%m.%Y') if r.enrolled_at else '—' }}</td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;color:var(--sub);padding:32px">Нет данных</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

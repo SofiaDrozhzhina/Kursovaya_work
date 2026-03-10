@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Преподаватели{% endblock %}
+{% block page_title %}🎓 Преподаватели{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header"><div class="table-title">Список преподавателей</div></div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Имя</th><th>Кафедра</th><th>Степень</th><th>Курсов</th><th>Студентов</th>{% if user.role=='admin' %}<th>Действия</th>{% endif %}</tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><strong>{{ r.full_name or '—' }}</strong><br><span class="td-sub">{{ r.email or '' }}</span></td>
+          <td>{{ r.department or '—' }}</td>
+          <td>{% if r.degree %}<span class="badge badge-purple">{{ r.degree }}</span>{% else %}—{% endif %}</td>
+          <td><span class="badge badge-blue">{{ r.courses_count }}</span></td>
+          <td><span class="badge badge-green">{{ r.students_count }}</span></td>
+          {% if user.role == 'admin' %}
+          <td>
+            <button class="btn btn-ghost btn-sm" onclick="openEditModal({{ r.id }}, '{{ r.department|replace("'","") if r.department else "" }}', '{{ r.degree|replace("'","") if r.degree else "" }}')">✎ Изменить</button>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--sub);padding:32px">Нет данных</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if user.role == 'admin' %}
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-title">✎ Редактировать преподавателя</div>
+    <form method="post" id="editForm" action="">
+      <div class="form-group"><label>Кафедра</label><input type="text" name="department" id="ef_dept"></div>
+      <div class="form-group"><label>Учёная степень</label><input type="text" name="degree" id="ef_degree"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editModal')">Отмена</button>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script>
+function openEditModal(id, dept, degree) {
+  document.getElementById('ef_dept').value = dept;
+  document.getElementById('ef_degree').value = degree;
+  document.getElementById('editForm').action = `/teachers/${id}/edit`;
+  openModal('editModal');
+}
+</script>
+{% endblock %}

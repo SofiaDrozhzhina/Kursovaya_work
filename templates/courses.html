@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Курсы{% endblock %}
+{% block page_title %}📖 Курсы{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header">
+    <div class="table-title">Список курсов</div>
+    {% if user.role == 'admin' %}
+    <button class="btn btn-success" onclick="openModal('addModal')">✚ Добавить курс</button>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Название</th><th>Преподаватель</th><th>Студентов</th><th>Завершили</th><th>Ср. балл</th><th>Макс.</th>{% if user.role=='admin' %}<th>Действия</th>{% endif %}</tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>
+            <strong>{{ r.title }}</strong>
+            {% if r.description %}<br><span class="td-sub" style="max-width:280px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.description }}</span>{% endif %}
+          </td>
+          <td>{{ r.teacher_name or '—' }}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="badge badge-blue">{{ r.enrolled }}</span>
+              <div style="width:60px">
+                <div class="progress"><div class="progress-bar blue" style="width:{{ [(r.enrolled / r.max_students * 100)|int, 100]|min }}%"></div></div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-green">{{ r.completed }}</span></td>
+          <td>
+            {% if r.avg_grade %}
+            <strong style="color:{% if r.avg_grade>=75 %}var(--green){% elif r.avg_grade>=60 %}var(--yellow){% else %}var(--red){% endif %}">{{ r.avg_grade }}</strong>
+            {% else %}—{% endif %}
+          </td>
+          <td class="td-sub">{{ r.max_students }}</td>
+          {% if user.role == 'admin' %}
+          <td style="white-space:nowrap">
+            <button class="btn btn-ghost btn-sm" onclick="openEditModal({{ r.id }}, '{{ r.title|replace("'","") }}', '{{ r.description|replace("'","")|replace("\n"," ") if r.description else "" }}', '{{ r.max_students }}')">✎</button>
+            <form method="post" action="{{ url_for('delete_course', cid=r.id) }}" style="display:inline" onsubmit="return confirm('Удалить курс?')">
+              <button class="btn btn-danger btn-sm" type="submit">🗑</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--sub);padding:32px">Нет курсов</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if user.role == 'admin' %}
+<!-- Add modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">✚ Новый курс</div>
+    <form method="post" action="{{ url_for('add_course') }}">
+      <div class="form-group"><label>Название *</label><input type="text" name="title" required></div>
+      <div class="form-group"><label>Описание</label><textarea name="description"></textarea></div>
+      <div class="form-group">
+        <label>Преподаватель</label>
+        <select name="teacher_id">
+          <option value="">— Не назначен —</option>
+          {% for t in teacher_list %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group"><label>Макс. студентов</label><input type="number" name="max_students" value="30" min="1"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addModal')">Отмена</button>
+        <button type="submit" class="btn btn-primary">Создать</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-title">✎ Редактировать курс</div>
+    <form method="post" id="editForm" action="">
+      <div class="form-group"><label>Название *</label><input type="text" name="title" id="ef_title" required></div>
+      <div class="form-group"><label>Описание</label><textarea name="description" id="ef_desc"></textarea></div>
+      <div class="form-group">
+        <label>Преподаватель</label>
+        <select name="teacher_id" id="ef_teacher">
+          <option value="">— Не назначен —</option>
+          {% for t in teacher_list %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group"><label>Макс. студентов</label><input type="number" name="max_students" id="ef_max" min="1"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editModal')">Отмена</button>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openEditModal(id, title, desc, maxS) {
+  document.getElementById('ef_title').value = title;
+  document.getElementById('ef_desc').value = desc;
+  document.getElementById('ef_max').value = maxS;
+  document.getElementById('editForm').action = `/courses/${id}/edit`;
+  openModal('editModal');
+}
+</script>
+{% endblock %}

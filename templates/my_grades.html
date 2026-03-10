@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Мои оценки{% endblock %}
+{% block page_title %}⭐ Мои оценки{% endblock %}
+{% block content %}
+{% if avg %}
+<div class="stat-grid" style="margin-bottom:24px">
+  <div class="stat-card yellow" style="max-width:220px">
+    <div class="stat-icon">⭐</div>
+    <div class="stat-value">{{ avg }}</div>
+    <div class="stat-label">Ваш средний балл</div>
+  </div>
+</div>
+{% endif %}
+
+<div class="table-wrap">
+  <div class="table-header"><div class="table-title">Оценки по курсам</div></div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Курс</th><th>Преподаватель</th><th>Оценка</th><th>Статус</th><th>Дата</th><th>Комментарий</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><strong>{{ r.course }}</strong></td>
+          <td>{{ r.teacher or '—' }}</td>
+          <td>
+            {% if r.grade is not none %}
+            <strong style="font-size:1.1rem;color:{% if r.grade>=75 %}var(--green){% elif r.grade>=60 %}var(--yellow){% else %}var(--red){% endif %}">{{ r.grade }}</strong>
+            <span class="td-sub" style="font-size:0.75rem;margin-left:6px">
+              {% if r.grade>=90 %}Отлично{% elif r.grade>=75 %}Хорошо{% elif r.grade>=60 %}Удовл.{% else %}Неудовл.{% endif %}
+            </span>
+            {% else %}<span class="badge badge-gray">Ожидается</span>{% endif %}
+          </td>
+          <td>
+            {% if r.status=='completed' %}<span class="badge badge-green">Завершён</span>
+            {% elif r.status=='active' %}<span class="badge badge-blue">Активен</span>
+            {% else %}<span class="badge badge-gray">{{ r.status }}</span>{% endif %}
+          </td>
+          <td class="td-sub">{{ r.graded_at.strftime('%d.%m.%Y') if r.graded_at else '—' }}</td>
+          <td class="td-sub">{{ r.comment or '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:var(--sub);padding:32px">Вы ещё не записаны ни на один курс</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

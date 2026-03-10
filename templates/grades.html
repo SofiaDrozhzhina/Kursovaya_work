@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Оценки{% endblock %}
+{% block page_title %}⭐ Оценки{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <div class="table-header"><div class="table-title">Оценки студентов</div></div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Студент</th><th>Курс</th><th>Оценка</th><th>Статус</th><th>Дата</th><th>Комментарий</th><th>Действие</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><strong>{{ r.student }}</strong></td>
+          <td>{{ r.course }}</td>
+          <td>
+            {% if r.grade is not none %}
+            <strong style="color:{% if r.grade>=75 %}var(--green){% elif r.grade>=60 %}var(--yellow){% else %}var(--red){% endif %}">{{ r.grade }}</strong>
+            {% else %}<span class="badge badge-gray">Нет оценки</span>{% endif %}
+          </td>
+          <td>
+            {% if r.status=='completed' %}<span class="badge badge-green">Завершён</span>
+            {% elif r.status=='active' %}<span class="badge badge-blue">Активен</span>
+            {% else %}<span class="badge badge-gray">{{ r.status }}</span>{% endif %}
+          </td>
+          <td class="td-sub">{{ r.graded_at.strftime('%d.%m.%Y') if r.graded_at else '—' }}</td>
+          <td class="td-sub">{{ r.comment or '' }}</td>
+          <td>
+            <button class="btn btn-ghost btn-sm" onclick="openGradeModal({{ r.id }}, '{{ r.student|replace("'","") }}', '{{ r.course|replace("'","") }}', {{ r.grade if r.grade is not none else 'null' }}, '{{ r.comment|replace("'","") if r.comment else "" }}')">
+              {% if r.grade is not none %}✎ Изменить{% else %}✚ Выставить{% endif %}
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--sub);padding:32px">Нет данных</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="gradeModal">
+  <div class="modal">
+    <div class="modal-title">⭐ Выставить оценку</div>
+    <p id="gm_info" style="color:var(--sub);font-size:0.88rem;margin-bottom:20px"></p>
+    <form method="post" action="{{ url_for('set_grade') }}">
+      <input type="hidden" name="enrollment_id" id="gm_eid">
+      <div class="form-group">
+        <label>Оценка (0–100)</label>
+        <input type="number" name="grade" id="gm_grade" min="0" max="100" step="0.1" required>
+      </div>
+      <div class="form-group">
+        <label>Комментарий</label>
+        <textarea name="comment" id="gm_comment" rows="2"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('gradeModal')">Отмена</button>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openGradeModal(eid, student, course, grade, comment) {
+  document.getElementById('gm_eid').value = eid;
+  document.getElementById('gm_info').textContent = `Студент: ${student} | Курс: ${course}`;
+  document.getElementById('gm_grade').value = grade !== null ? grade : '';
+  document.getElementById('gm_comment').value = comment;
+  openModal('gradeModal');
+}
+</script>
+{% endblock %}

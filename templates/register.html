@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Регистрация — КурсПлатформа</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0f0f17; --surface:#17172a; --card:#1e1e35; --border:#2a2a45; --accent:#7b5ea7; --accent2:#4fc3f7; --green:#4ade80; --red:#f87171; --text:#e2e8f0; --sub:#94a3b8; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: stretch; }
+.auth-left {
+  width: 380px; background: linear-gradient(145deg, #0d2137 0%, #1a3a5c 50%, #0f2744 100%);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 60px 40px; position: relative; overflow: hidden;
+}
+.auth-left::before { content:''; position:absolute; top:-60px;left:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(79,195,247,0.25) 0%,transparent 70%); }
+.auth-brand { position:relative;z-index:1;text-align:center; }
+.auth-brand .icon { font-size:4rem;display:block;margin-bottom:16px; }
+.auth-brand h1 { font-family:'Syne',sans-serif;font-weight:800;font-size:1.8rem;color:#fff; }
+.auth-brand p { color:rgba(255,255,255,0.6);margin-top:8px;font-size:0.9rem;line-height:1.6; }
+.steps { margin-top:40px;display:flex;flex-direction:column;gap:12px;position:relative;z-index:1;width:100%; }
+.step { display:flex;align-items:center;gap:12px; }
+.step-num { width:28px;height:28px;border-radius:50%;background:rgba(79,195,247,0.2);border:1px solid rgba(79,195,247,0.4);color:var(--accent2);font-size:0.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+.step span { font-size:0.85rem;color:rgba(255,255,255,0.7); }
+.auth-right { flex:1;display:flex;align-items:center;justify-content:center;padding:40px; }
+.auth-form-wrap { width:100%;max-width:460px; }
+.auth-form-wrap h2 { font-family:'Syne',sans-serif;font-weight:700;font-size:1.7rem;color:#fff;margin-bottom:4px; }
+.auth-form-wrap .sub { color:var(--sub);font-size:0.88rem;margin-bottom:28px; }
+.form-row { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
+.form-group { margin-bottom:14px; }
+label { display:block;font-size:0.75rem;font-weight:600;color:var(--sub);margin-bottom:6px;letter-spacing:0.06em;text-transform:uppercase; }
+input, select { width:100%;padding:11px 14px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:0.9rem;font-family:inherit;outline:none;transition:border-color 0.18s; }
+input:focus, select:focus { border-color:var(--accent); }
+select option { background:var(--surface); }
+.btn-submit { width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s;margin-top:4px; }
+.btn-submit:hover { background:#9575cd;transform:translateY(-1px); }
+.auth-switch { text-align:center;margin-top:20px;font-size:0.88rem;color:var(--sub); }
+.auth-switch a { color:var(--accent2);text-decoration:none;font-weight:600; }
+.alert-error { background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);color:var(--red);padding:10px 14px;border-radius:8px;font-size:0.88rem;margin-bottom:14px; }
+.role-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px; }
+.role-card { border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;transition:all 0.18s;text-align:center; }
+.role-card input[type=radio] { display:none; }
+.role-card:has(input:checked) { border-color:var(--accent);background:rgba(123,94,167,0.1); }
+.role-card .r-icon { font-size:1.5rem;display:block;margin-bottom:4px; }
+.role-card .r-label { font-size:0.82rem;font-weight:600;color:var(--text); }
+.role-card .r-sub { font-size:0.72rem;color:var(--sub);margin-top:2px; }
+</style>
+</head>
+<body>
+<div class="auth-left">
+  <div class="auth-brand">
+    <span class="icon">✨</span>
+    <h1>Регистрация</h1>
+    <p>Присоединяйтесь к платформе и начните обучение</p>
+  </div>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><span>Заполните данные профиля</span></div>
+    <div class="step"><div class="step-num">2</div><span>Выберите роль в системе</span></div>
+    <div class="step"><div class="step-num">3</div><span>Войдите и начните работу</span></div>
+  </div>
+</div>
+
+<div class="auth-right">
+  <div class="auth-form-wrap">
+    <h2>Создать аккаунт</h2>
+    <p class="sub">Поля, отмеченные *, обязательны для заполнения</p>
+
+    {% for cat, msg in get_flashed_messages(with_categories=True) %}
+    <div class="alert-error">{{ msg }}</div>
+    {% endfor %}
+
+    <form method="post">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Полное имя *</label>
+          <input type="text" name="full_name" placeholder="Иванов Иван Иванович" required>
+        </div>
+        <div class="form-group">
+          <label>Логин *</label>
+          <input type="text" name="username" placeholder="ivan_ivanov" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" name="email" placeholder="ivan@example.ru">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Пароль * (мин. 6 символов)</label>
+          <input type="password" name="password" placeholder="••••••••" required>
+        </div>
+        <div class="form-group">
+          <label>Повторите пароль *</label>
+          <input type="password" name="password2" placeholder="••••••••" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Роль *</label>
+        <div class="role-grid">
+          <label class="role-card">
+            <input type="radio" name="role" value="student" checked>
+            <span class="r-icon">🎒</span>
+            <div class="r-label">Студент</div>
+            <div class="r-sub">Запись на курсы, оценки</div>
+          </label>
+          <label class="role-card">
+            <input type="radio" name="role" value="teacher">
+            <span class="r-icon">🎓</span>
+            <div class="r-label">Преподаватель</div>
+            <div class="r-sub">Ведение курсов, оценивание</div>
+          </label>
+        </div>
+      </div>
+
+      <button class="btn-submit" type="submit">Создать аккаунт →</button>
+    </form>
+
+    <div class="auth-switch">
+      Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

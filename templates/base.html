@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}КурсПлатформа{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ── DARK THEME (default) ──────────────── */
+    :root, [data-theme="dark"] {
+      --bg:       #0f0f17;
+      --surface:  #17172a;
+      --card:     #1e1e35;
+      --border:   #2a2a45;
+      --accent:   #7b5ea7;
+      --accent2:  #4fc3f7;
+      --green:    #4ade80;
+      --yellow:   #fbbf24;
+      --red:      #f87171;
+      --text:     #e2e8f0;
+      --sub:      #94a3b8;
+      --white:    #ffffff;
+      --radius:   12px;
+      --shadow:   0 4px 24px rgba(0,0,0,0.4);
+      --row-hover: rgba(255,255,255,0.03);
+      --modal-bg: rgba(0,0,0,0.7);
+    }
+
+    /* ── LIGHT THEME ───────────────────────── */
+    [data-theme="light"] {
+      --bg:       #f0f2f8;
+      --surface:  #ffffff;
+      --card:     #ffffff;
+      --border:   #e2e8f0;
+      --accent:   #7b5ea7;
+      --accent2:  #0284c7;
+      --green:    #16a34a;
+      --yellow:   #d97706;
+      --red:      #dc2626;
+      --text:     #1e293b;
+      --sub:      #64748b;
+      --white:    #1e293b;
+      --radius:   12px;
+      --shadow:   0 4px 24px rgba(0,0,0,0.1);
+      --row-hover: rgba(0,0,0,0.02);
+      --modal-bg: rgba(0,0,0,0.4);
+    }
+
+    /* Плавный переход */
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease;
+    }
+    html { font-size: 15px; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+    /* ── Sidebar ───────────────────────────── */
+    .sidebar {
+      width: 240px; min-height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+    .sidebar-logo { padding: 28px 24px 20px; border-bottom: 1px solid var(--border); }
+    .sidebar-logo .logo-icon { font-size: 2rem; }
+    .sidebar-logo .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.15rem; color: var(--text); margin-top: 4px; }
+    .sidebar-logo .logo-sub  { font-size: 0.75rem; color: var(--sub); margin-top: 2px; }
+    .sidebar-user { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+    .sidebar-user .u-name { font-weight: 600; color: var(--text); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-user .u-role { font-size: 0.75rem; color: var(--accent2); margin-top: 3px; }
+    .sidebar-nav { flex: 1; padding: 12px 12px; overflow-y: auto; }
+    .nav-section { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; color: var(--sub); text-transform: uppercase; padding: 12px 12px 4px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 8px;
+      color: var(--sub); text-decoration: none;
+      font-size: 0.9rem; font-weight: 500;
+      cursor: pointer; border: none; background: none; width: 100%; text-align: left;
+      transition: background 0.18s, color 0.18s;
+    }
+    .nav-item:hover { background: var(--border); color: var(--text); }
+    .nav-item.active { background: rgba(123,94,167,0.15); color: var(--accent2); }
+    .nav-item .nav-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .sidebar-footer { padding: 12px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+
+    /* ── Theme Toggle ──────────────────────── */
+    .theme-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-radius: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      cursor: pointer; user-select: none;
+    }
+    .theme-toggle-label { font-size: 0.82rem; font-weight: 600; color: var(--sub); display: flex; align-items: center; gap: 6px; }
+    .toggle-track {
+      width: 40px; height: 22px; border-radius: 11px;
+      background: var(--border); position: relative;
+      transition: background 0.25s; flex-shrink: 0;
+    }
+    [data-theme="light"] .toggle-track { background: var(--accent); }
+    .toggle-thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--sub); transition: transform 0.25s, background 0.25s;
+    }
+    [data-theme="light"] .toggle-thumb { transform: translateX(18px); background: #fff; }
+
+    .btn-logout {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; padding: 10px 12px; border-radius: 8px;
+      background: rgba(248,113,113,0.1); color: var(--red);
+      border: 1px solid rgba(248,113,113,0.2);
+      font-size: 0.9rem; font-weight: 500; cursor: pointer;
+      text-decoration: none; transition: all 0.18s;
+    }
+    .btn-logout:hover { background: rgba(248,113,113,0.2); }
+
+    /* ── Main content ──────────────────────── */
+    .main { margin-left: 240px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+    .topbar {
+      padding: 18px 32px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); position: sticky; top: 0; z-index: 50;
+    }
+    .topbar-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.3rem; color: var(--text); }
+    .topbar-date  { font-size: 0.8rem; color: var(--sub); }
+    .content { padding: 32px; flex: 1; }
+
+    /* ── Stat cards ────────────────────────── */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px 20px;
+      position: relative; overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    [data-theme="light"] .stat-card { box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .stat-card.purple::before { background: var(--accent); }
+    .stat-card.blue::before   { background: var(--accent2); }
+    .stat-card.green::before  { background: var(--green); }
+    .stat-card.yellow::before { background: var(--yellow); }
+    .stat-card.red::before    { background: var(--red); }
+    .stat-value { font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800; color: var(--text); line-height: 1; }
+    .stat-label { font-size: 0.78rem; color: var(--sub); margin-top: 6px; }
+    .stat-icon  { font-size: 1.8rem; position: absolute; top: 18px; right: 18px; opacity: 0.2; }
+
+    /* ── Table ─────────────────────────────── */
+    .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    [data-theme="light"] .table-wrap { box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+    .table-header { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .table-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.05rem; color: var(--text); }
+    .table-responsive { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead th { background: var(--bg); color: var(--sub); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 12px 16px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--row-hover); }
+    tbody td { padding: 12px 16px; color: var(--text); vertical-align: middle; }
+    .td-sub { color: var(--sub); font-size: 0.82rem; }
+
+    /* ── Badges ────────────────────────────── */
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+    .badge-green  { background: rgba(74,222,128,0.12);  color: var(--green); }
+    .badge-blue   { background: rgba(79,195,247,0.12);  color: var(--accent2); }
+    .badge-yellow { background: rgba(251,191,36,0.12);  color: var(--yellow); }
+    .badge-red    { background: rgba(248,113,113,0.12); color: var(--red); }
+    .badge-purple { background: rgba(123,94,167,0.15);  color: var(--accent); }
+    .badge-gray   { background: rgba(148,163,184,0.12); color: var(--sub); }
+    [data-theme="light"] .badge-green  { background: rgba(22,163,74,0.1); }
+    [data-theme="light"] .badge-blue   { background: rgba(2,132,199,0.1); }
+    [data-theme="light"] .badge-yellow { background: rgba(217,119,6,0.1); }
+    [data-theme="light"] .badge-red    { background: rgba(220,38,38,0.1); }
+
+    /* ── Buttons ───────────────────────────── */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all 0.18s; font-family: inherit; }
+    .btn-primary   { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #9575cd; }
+    .btn-success   { background: rgba(74,222,128,0.15); color: var(--green); border: 1px solid rgba(74,222,128,0.25); }
+    .btn-success:hover { background: rgba(74,222,128,0.25); }
+    .btn-danger    { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+    .btn-danger:hover  { background: rgba(248,113,113,0.22); }
+    .btn-ghost     { background: transparent; color: var(--sub); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+    .btn-sm        { padding: 5px 12px; font-size: 0.8rem; }
+    [data-theme="light"] .btn-success { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.2); }
+    [data-theme="light"] .btn-danger  { background: rgba(220,38,38,0.08); border-color: rgba(220,38,38,0.15); }
+
+    /* ── Forms ─────────────────────────────── */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--sub); margin-bottom: 6px; letter-spacing: 0.04em; }
+    input[type=text], input[type=password], input[type=email], input[type=number], select, textarea {
+      width: 100%; padding: 10px 14px; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit; outline: none; transition: border-color 0.18s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    select option { background: var(--surface); }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* ── Alerts ────────────────────────────── */
+    .alerts { margin-bottom: 20px; }
+    .alert { padding: 12px 18px; border-radius: 8px; font-size: 0.88rem; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+    .alert-success { background: rgba(74,222,128,0.1);  border: 1px solid rgba(74,222,128,0.2);  color: var(--green); }
+    .alert-error   { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--red); }
+    .alert-info    { background: rgba(79,195,247,0.1);  border: 1px solid rgba(79,195,247,0.2);  color: var(--accent2); }
+
+    /* ── Modal ─────────────────────────────── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: var(--modal-bg); z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 100%; max-width: 480px; box-shadow: var(--shadow); }
+    .modal-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.15rem; color: var(--text); margin-bottom: 20px; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ── Search / Misc / Tabs / Progress ───── */
+    .search-box { display: flex; align-items: center; gap: 8px; }
+    .search-box input { width: 240px; padding: 8px 14px; }
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.7rem; color: var(--text); }
+    .page-header p { color: var(--sub); margin-top: 4px; font-size: 0.88rem; }
+    .section-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; color: var(--accent2); margin: 28px 0 12px; }
+    .empty-state { text-align: center; padding: 48px; color: var(--sub); }
+    .empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+    .tab-btn { padding: 10px 18px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--sub); font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.18s; font-family: inherit; margin-bottom: -1px; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .progress { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 4px; transition: width 0.4s; }
+    .progress-bar.purple { background: var(--accent); }
+    .progress-bar.green  { background: var(--green); }
+    .progress-bar.blue   { background: var(--accent2); }
+
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .main { margin-left: 0; }
+    }
+  </style>
+
+  <!-- Применяем тему ДО рендера, чтобы не было мигания -->
+  <script>
+    (function() {
+      const t = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+{% if session.user_id is defined or session['user_id'] is defined %}
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📚</div>
+    <div class="logo-text">КурсПлатформа</div>
+    <div class="logo-sub">Система управления обучением</div>
+  </div>
+
+  <div class="sidebar-user">
+    <div class="u-name">{{ session.get('full_name','') }}</div>
+    <div class="u-role">
+      {% if session.get('role') == 'admin' %}🔑 Администратор
+      {% elif session.get('role') == 'teacher' %}🎓 Преподаватель
+      {% else %}🎒 Студент{% endif %}
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    {% set role = session.get('role') %}
+    <div class="nav-section">Главное</div>
+    <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+      <span class="nav-icon">📊</span> Дашборд
+    </a>
+
+    {% if role in ['admin','teacher'] %}
+    <div class="nav-section">Управление</div>
+    {% if role == 'admin' %}
+    <a href="{{ url_for('users') }}" class="nav-item {% if request.endpoint=='users' %}active{% endif %}">
+      <span class="nav-icon">👥</span> Пользователи
+    </a>
+    {% endif %}
+    <a href="{{ url_for('students') }}" class="nav-item {% if request.endpoint=='students' %}active{% endif %}">
+      <span class="nav-icon">🎒</span> Студенты
+    </a>
+    <a href="{{ url_for('teachers') }}" class="nav-item {% if request.endpoint=='teachers' %}active{% endif %}">
+      <span class="nav-icon">🎓</span> Преподаватели
+    </a>
+    <a href="{{ url_for('courses') }}" class="nav-item {% if request.endpoint=='courses' %}active{% endif %}">
+      <span class="nav-icon">📖</span> Курсы
+    </a>
+    <a href="{{ url_for('grades') }}" class="nav-item {% if request.endpoint=='grades' %}active{% endif %}">
+      <span class="nav-icon">⭐</span> Оценки
+    </a>
+    <a href="{{ url_for('statistics') }}" class="nav-item {% if request.endpoint=='statistics' %}active{% endif %}">
+      <span class="nav-icon">📈</span> Статистика
+    </a>
+    {% endif %}
+
+    {% if role in ['student','teacher'] %}
+    <div class="nav-section">Личное</div>
+    <a href="{{ url_for('my_courses') }}" class="nav-item {% if request.endpoint=='my_courses' %}active{% endif %}">
+      <span class="nav-icon">📖</span> Мои курсы
+    </a>
+    {% if role == 'student' %}
+    <a href="{{ url_for('enroll') }}" class="nav-item {% if request.endpoint=='enroll' %}active{% endif %}">
+      <span class="nav-icon">➕</span> Запись на курс
+    </a>
+    <a href="{{ url_for('my_grades') }}" class="nav-item {% if request.endpoint=='my_grades' %}active{% endif %}">
+      <span class="nav-icon">⭐</span> Мои оценки
+    </a>
+    {% endif %}
+    {% endif %}
+  </nav>
+
+  <div class="sidebar-footer">
+    <!-- Переключатель темы -->
+    <div class="theme-toggle" id="themeToggle" title="Переключить тему">
+      <span class="theme-toggle-label">
+        <span id="themeIcon">🌙</span>
+        <span id="themeLabel">Тёмная тема</span>
+      </span>
+      <div class="toggle-track">
+        <div class="toggle-thumb"></div>
+      </div>
+    </div>
+
+    <a href="{{ url_for('logout') }}" class="btn-logout">
+      <span>🚪</span> Выйти
+    </a>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+    <div class="topbar-date">{{ now.strftime('%d %B %Y') if now else '' }}</div>
+  </div>
+  <div class="content">
+    {% if get_flashed_messages() %}
+    <div class="alerts">
+      {% for cat, msg in get_flashed_messages(with_categories=True) %}
+      <div class="alert alert-{{ 'success' if cat=='success' else 'error' if cat=='error' else 'info' }}">
+        <span>{{ '✓' if cat=='success' else '✕' if cat=='error' else 'ℹ' }}</span> {{ msg }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+{% else %}
+{% block auth_content %}{% endblock %}
+{% endif %}
+
+<script>
+  // ── Theme toggle ─────────────────────────────────────────
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    const icon  = document.getElementById('themeIcon');
+    const label = document.getElementById('themeLabel');
+    if (icon)  icon.textContent  = theme === 'light' ? '☀️' : '🌙';
+    if (label) label.textContent = theme === 'light' ? 'Светлая тема' : 'Тёмная тема';
+  }
+
+  // Инициализация
+  applyTheme(localStorage.getItem('theme') || 'dark');
+
+  // Клик
+  document.getElementById('themeToggle')?.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  });
+
+  // ── Tabs ─────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(target)?.classList.add('active');
+    });
+  });
+
+  // ── Modals ────────────────────────────────────────────────
+  function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
+  function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+  document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+  });
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

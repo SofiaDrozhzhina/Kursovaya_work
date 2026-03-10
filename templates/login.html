@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вход — КурсПлатформа</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0f0f17; --surface:#17172a; --card:#1e1e35; --border:#2a2a45; --accent:#7b5ea7; --accent2:#4fc3f7; --green:#4ade80; --red:#f87171; --text:#e2e8f0; --sub:#94a3b8; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: stretch; }
+
+.auth-left {
+  width: 460px; background: linear-gradient(145deg, #1a1235 0%, #2d1b69 50%, #1a2a5e 100%);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 60px 48px; position: relative; overflow: hidden;
+}
+.auth-left::before {
+  content: ''; position: absolute; top: -80px; left: -80px;
+  width: 350px; height: 350px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(123,94,167,0.3) 0%, transparent 70%);
+}
+.auth-left::after {
+  content: ''; position: absolute; bottom: -60px; right: -60px;
+  width: 280px; height: 280px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(79,195,247,0.2) 0%, transparent 70%);
+}
+.auth-brand { position: relative; z-index: 1; text-align: center; }
+.auth-brand .icon { font-size: 5rem; display: block; margin-bottom: 20px; filter: drop-shadow(0 8px 24px rgba(123,94,167,0.5)); }
+.auth-brand h1 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 2rem; color: #fff; }
+.auth-brand p { color: rgba(255,255,255,0.6); margin-top: 10px; font-size: 0.95rem; line-height: 1.6; }
+.auth-features { margin-top: 48px; display: flex; flex-direction: column; gap: 14px; position: relative; z-index: 1; width: 100%; }
+.auth-feature { display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.06); border-radius: 10px; padding: 12px 16px; }
+.auth-feature .feat-icon { font-size: 1.3rem; }
+.auth-feature span { font-size: 0.85rem; color: rgba(255,255,255,0.75); }
+
+.auth-right {
+  flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px;
+}
+.auth-form-wrap { width: 100%; max-width: 400px; }
+.auth-form-wrap h2 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.8rem; color: #fff; margin-bottom: 8px; }
+.auth-form-wrap .sub { color: var(--sub); font-size: 0.9rem; margin-bottom: 32px; }
+
+.form-group { margin-bottom: 18px; }
+label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--sub); margin-bottom: 7px; letter-spacing: 0.06em; text-transform: uppercase; }
+input {
+  width: 100%; padding: 12px 16px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+  font-size: 0.95rem; font-family: inherit; outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(123,94,167,0.15); }
+
+.btn-submit {
+  width: 100%; padding: 13px; background: var(--accent);
+  color: #fff; border: none; border-radius: 10px;
+  font-size: 1rem; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: all 0.2s; margin-top: 8px;
+}
+.btn-submit:hover { background: #9575cd; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(123,94,167,0.35); }
+
+.auth-switch { text-align: center; margin-top: 24px; font-size: 0.88rem; color: var(--sub); }
+.auth-switch a { color: var(--accent2); text-decoration: none; font-weight: 600; }
+.auth-switch a:hover { text-decoration: underline; }
+
+.alert-error { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: var(--red); padding: 10px 14px; border-radius: 8px; font-size: 0.88rem; margin-bottom: 16px; }
+.alert-success { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: var(--green); padding: 10px 14px; border-radius: 8px; font-size: 0.88rem; margin-bottom: 16px; }
+
+.role-pills { display: flex; gap: 8px; margin-bottom: 8px; }
+.role-pill { flex: 1; text-align: center; padding: 8px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 0.82rem; transition: all 0.18s; }
+.role-pill input { display: none; }
+.role-pill:has(input:checked) { border-color: var(--accent); background: rgba(123,94,167,0.1); color: #b39ddb; }
+</style>
+</head>
+<body>
+
+<div class="auth-left">
+  <div class="auth-brand">
+    <span class="icon">📚</span>
+    <h1>КурсПлатформа</h1>
+    <p>Система управления учебными курсами и успеваемостью студентов</p>
+  </div>
+  <div class="auth-features">
+    <div class="auth-feature"><span class="feat-icon">🎒</span><span>Запись студентов на курсы</span></div>
+    <div class="auth-feature"><span class="feat-icon">⭐</span><span>Выставление и отслеживание оценок</span></div>
+    <div class="auth-feature"><span class="feat-icon">📈</span><span>Детальная статистика по всем разделам</span></div>
+    <div class="auth-feature"><span class="feat-icon">👥</span><span>Три роли: студент, преподаватель, администратор</span></div>
+  </div>
+</div>
+
+<div class="auth-right">
+  <div class="auth-form-wrap">
+    <h2>Добро пожаловать</h2>
+    <p class="sub">Войдите в свой аккаунт для продолжения</p>
+
+    {% for cat, msg in get_flashed_messages(with_categories=True) %}
+    <div class="alert-{{ 'success' if cat=='success' else 'error' }}">{{ msg }}</div>
+    {% endfor %}
+
+    <form method="post">
+      <div class="form-group">
+        <label>Логин</label>
+        <input type="text" name="username" placeholder="Введите логин" required autofocus>
+      </div>
+      <div class="form-group">
+        <label>Пароль</label>
+        <input type="password" name="password" placeholder="••••••••" required>
+      </div>
+      <button class="btn-submit" type="submit">Войти →</button>
+    </form>
+
+    <div class="auth-switch">
+      Нет аккаунта? <a href="{{ url_for('register') }}">Зарегистрироваться</a>
+    </div>
+
+    <div class="auth-switch" style="margin-top:20px; padding: 14px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border);">
+      <strong style="color:var(--text)">Demo:</strong><br>
+      admin / admin123 &nbsp;·&nbsp; teacher1 / pass123 &nbsp;·&nbsp; student1 / pass123
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

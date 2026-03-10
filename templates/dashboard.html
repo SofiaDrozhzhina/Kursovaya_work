@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — КурсПлатформа{% endblock %}
+{% block page_title %}Дашборд{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>
+    {% if user.role == 'admin' %}👑{% elif user.role == 'teacher' %}🎓{% else %}🎒{% endif %}
+    Добро пожаловать, {{ user.full_name }}!
+  </h1>
+  <p>{% if user.role == 'admin' %}Панель администратора{% elif user.role == 'teacher' %}Панель преподавателя{% else %}Личный кабинет студента{% endif %}</p>
+</div>
+
+<!-- Stat cards -->
+<div class="stat-grid">
+{% if user.role in ['admin','teacher'] %}
+  <div class="stat-card purple">
+    <div class="stat-icon">🎒</div>
+    <div class="stat-value">{{ stats.students }}</div>
+    <div class="stat-label">Всего студентов</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-icon">📖</div>
+    <div class="stat-value">{{ stats.courses }}</div>
+    <div class="stat-label">Курсов</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon">🎓</div>
+    <div class="stat-value">{{ stats.teachers }}</div>
+    <div class="stat-label">Преподавателей</div>
+  </div>
+  <div class="stat-card yellow">
+    <div class="stat-icon">⭐</div>
+    <div class="stat-value">{{ stats.avg_grade }}</div>
+    <div class="stat-label">Средний балл</div>
+  </div>
+{% else %}
+  <div class="stat-card purple">
+    <div class="stat-icon">📖</div>
+    <div class="stat-value">{{ stats.get('enrolled',0) }}</div>
+    <div class="stat-label">Записан на курсов</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon">✅</div>
+    <div class="stat-value">{{ stats.get('completed',0) }}</div>
+    <div class="stat-label">Завершено</div>
+  </div>
+  <div class="stat-card yellow">
+    <div class="stat-icon">⭐</div>
+    <div class="stat-value">{{ stats.get('avg_grade',0) or '—' }}</div>
+    <div class="stat-label">Средний балл</div>
+  </div>
+{% endif %}
+</div>
+
+<!-- Recent activity -->
+<div class="table-wrap">
+  <div class="table-header">
+    <div class="table-title">
+      {% if user.role in ['admin','teacher'] %}📋 Последние записи на курсы{% else %}📋 Мои курсы{% endif %}
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          {% if user.role in ['admin','teacher'] %}
+          <th>Студент</th><th>Курс</th><th>Дата</th><th>Статус</th>
+          {% else %}
+          <th>Курс</th><th>Дата записи</th><th>Статус</th><th>Оценка</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recent %}
+        <tr>
+          {% if user.role in ['admin','teacher'] %}
+          <td>{{ r.student }}</td>
+          <td>{{ r.course }}</td>
+          <td class="td-sub">{{ r.enrolled_at.strftime('%d.%m.%Y') if r.enrolled_at else '—' }}</td>
+          <td>
+            {% if r.status == 'completed' %}<span class="badge badge-green">Завершён</span>
+            {% elif r.status == 'active' %}<span class="badge badge-blue">Активен</span>
+            {% else %}<span class="badge badge-gray">{{ r.status }}</span>{% endif %}
+          </td>
+          {% else %}
+          <td>{{ r.course }}</td>
+          <td class="td-sub">{{ r.enrolled_at.strftime('%d.%m.%Y') if r.enrolled_at else '—' }}</td>
+          <td>
+            {% if r.status == 'completed' %}<span class="badge badge-green">Завершён</span>
+            {% elif r.status == 'active' %}<span class="badge badge-blue">Активен</span>
+            {% else %}<span class="badge badge-gray">{{ r.status }}</span>{% endif %}
+          </td>
+          <td>{{ r.grade if r.grade is not none else '—' }}</td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;color:var(--sub);padding:32px">Нет данных</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

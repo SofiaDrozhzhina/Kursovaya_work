@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Статистика{% endblock %}
+{% block page_title %}📈 Статистика{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+.stat-row { display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px; }
+.stat-row .sr-label { color:var(--sub);font-size:0.88rem; }
+.stat-row .sr-value { font-weight:700;font-size:1rem; }
+.top-list { display:flex;flex-direction:column;gap:8px; }
+.top-item { display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border-radius:8px;border:1px solid var(--border); }
+.top-rank { font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--sub);width:24px;text-align:center; }
+.top-rank.r1 { color:var(--yellow); }
+.top-rank.r2 { color:var(--sub); }
+.top-rank.r3 { color:#cd7f32; }
+.top-name { flex:1;font-weight:500; }
+.top-val  { font-family:'Syne',sans-serif;font-weight:700;color:var(--accent2); }
+.chart-wrap { background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;height:280px;display:flex;align-items:center;justify-content:center; }
+.two-col { display:grid;grid-template-columns:1fr 1fr;gap:20px; }
+@media(max-width:800px){.two-col{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tabs">
+  <button class="tab-btn active" data-tab="tab-students">🎒 Студенты</button>
+  <button class="tab-btn" data-tab="tab-courses">📖 Курсы</button>
+  <button class="tab-btn" data-tab="tab-teachers">🎓 Преподаватели</button>
+  <button class="tab-btn" data-tab="tab-grades">⭐ Оценки</button>
+</div>
+
+<!-- Students tab -->
+<div class="tab-pane active" id="tab-students">
+  <div class="stat-grid">
+    <div class="stat-card purple"><div class="stat-icon">🎒</div><div class="stat-value">{{ st.total }}</div><div class="stat-label">Всего студентов</div></div>
+    <div class="stat-card blue"><div class="stat-icon">📚</div><div class="stat-value">{{ st.active }}</div><div class="stat-label">Активно учатся</div></div>
+    <div class="stat-card yellow"><div class="stat-icon">⭐</div><div class="stat-value">{{ st.avg }}</div><div class="stat-label">Средний балл</div></div>
+    <div class="stat-card red"><div class="stat-icon">⚠️</div><div class="stat-value">{{ st.no_grade }}</div><div class="stat-label">Без оценки</div></div>
+  </div>
+  <div class="two-col">
+    <div>
+      <div class="section-title">Показатели успеваемости</div>
+      <div class="stat-row"><span class="sr-label">Максимальная оценка</span><span class="sr-value" style="color:var(--green)">{{ st.max }}</span></div>
+      <div class="stat-row"><span class="sr-label">Минимальная оценка</span><span class="sr-value" style="color:var(--red)">{{ st.min }}</span></div>
+      <div class="stat-row"><span class="sr-label">Среднее по всем оценкам</span><span class="sr-value" style="color:var(--yellow)">{{ st.avg }}</span></div>
+    </div>
+    <div>
+      <div class="section-title">🏆 Топ-5 студентов по среднему баллу</div>
+      <div class="top-list">
+        {% for r in st.top5 %}{% set i = loop.index %}
+        <div class="top-item">
+          <div class="top-rank r{{ i if i<=3 else '' }}">{{ i }}</div>
+          <div class="top-name">{{ r.full_name }}</div>
+          <div class="top-val">{{ r.avg }}</div>
+        </div>
+        {% else %}
+        <p style="color:var(--sub)">Нет данных</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Courses tab -->
+<div class="tab-pane" id="tab-courses">
+  <div class="stat-grid">
+    <div class="stat-card purple"><div class="stat-icon">📖</div><div class="stat-value">{{ co.total }}</div><div class="stat-label">Всего курсов</div></div>
+    <div class="stat-card green"><div class="stat-icon">🎓</div><div class="stat-value">{{ co.with_t }}</div><div class="stat-label">С преподавателем</div></div>
+    <div class="stat-card yellow"><div class="stat-icon">👥</div><div class="stat-value">{{ co.avg_enr }}</div><div class="stat-label">Ср. студентов/курс</div></div>
+  </div>
+  <div class="two-col">
+    <div>
+      <div class="section-title">Дополнительные показатели</div>
+      {% if co.popular %}
+      <div class="stat-row"><span class="sr-label">Самый популярный курс</span><span class="sr-value" style="color:var(--accent2)">{{ co.popular.title }} ({{ co.popular.cnt }} чел.)</span></div>
+      {% endif %}
+      <div class="chart-wrap" style="margin-top:16px;height:220px">
+        <canvas id="chartEnroll"></canvas>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">🏆 Топ-5 курсов по среднему баллу</div>
+      <div class="top-list">
+        {% for r in co.top5 %}{% set i = loop.index %}
+        <div class="top-item">
+          <div class="top-rank r{{ i if i<=3 else '' }}">{{ i }}</div>
+          <div class="top-name">{{ r.title }}</div>
+          <div class="top-val">{{ r.avg }}</div>
+        </div>
+        {% else %}
+        <p style="color:var(--sub)">Нет данных</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Teachers tab -->
+<div class="tab-pane" id="tab-teachers">
+  <div class="stat-grid">
+    <div class="stat-card purple"><div class="stat-icon">🎓</div><div class="stat-value">{{ tc.total }}</div><div class="stat-label">Всего преподавателей</div></div>
+    <div class="stat-card green"><div class="stat-icon">📖</div><div class="stat-value">{{ tc.active }}</div><div class="stat-label">Ведут курсы</div></div>
+    <div class="stat-card blue"><div class="stat-icon">📊</div><div class="stat-value">{{ tc.avg_courses }}</div><div class="stat-label">Ср. курсов/препод.</div></div>
+  </div>
+  <div class="section-title">🏆 Топ-5 преподавателей по числу студентов</div>
+  <div class="top-list">
+    {% for r in tc.top5 %}{% set i = loop.index %}
+    <div class="top-item">
+      <div class="top-rank r{{ i if i<=3 else '' }}">{{ i }}</div>
+      <div class="top-name">{{ r.full_name }}</div>
+      <div class="top-val">{{ r.students }} студентов</div>
+    </div>
+    {% else %}
+    <p style="color:var(--sub)">Нет данных</p>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Grades tab -->
+<div class="tab-pane" id="tab-grades">
+  <div class="stat-grid">
+    <div class="stat-card purple"><div class="stat-icon">📋</div><div class="stat-value">{{ dist.total }}</div><div class="stat-label">Всего оценок</div></div>
+    <div class="stat-card yellow"><div class="stat-icon">⭐</div><div class="stat-value">{{ st.avg }}</div><div class="stat-label">Средний балл</div></div>
+  </div>
+  <div class="two-col">
+    <div>
+      <div class="section-title">Распределение оценок</div>
+      <div class="stat-row"><span class="sr-label">🟢 Отлично (90–100)</span><span class="sr-value" style="color:var(--green)">{{ dist.excellent }}</span></div>
+      <div class="stat-row"><span class="sr-label">🔵 Хорошо (75–89)</span><span class="sr-value" style="color:var(--accent2)">{{ dist.good }}</span></div>
+      <div class="stat-row"><span class="sr-label">🟡 Удовлетворительно (60–74)</span><span class="sr-value" style="color:var(--yellow)">{{ dist.satisf }}</span></div>
+      <div class="stat-row"><span class="sr-label">🔴 Неудовлетворительно (0–59)</span><span class="sr-value" style="color:var(--red)">{{ dist.fail }}</span></div>
+    </div>
+    <div>
+      <div class="section-title">Диаграмма</div>
+      <div class="chart-wrap">
+        <canvas id="chartGrades"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Grade distribution pie chart
+const ctxG = document.getElementById('chartGrades').getContext('2d');
+new Chart(ctxG, {
+  type: 'doughnut',
+  data: {
+    labels: ['Отлично', 'Хорошо', 'Удовл.', 'Неудовл.'],
+    datasets: [{
+      data: [{{ dist.excellent }}, {{ dist.good }}, {{ dist.satisf }}, {{ dist.fail }}],
+      backgroundColor: ['#4ade80','#4fc3f7','#fbbf24','#f87171'],
+      borderColor: '#1e1e35', borderWidth: 3
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#94a3b8', font: { size: 12 } } } }
+  }
+});
+
+// Enrollments by course bar chart
+fetch('/api/chart/enrollments-by-course')
+  .then(r => r.json()).then(data => {
+    const ctxE = document.getElementById('chartEnroll').getContext('2d');
+    new Chart(ctxE, {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.title.length > 18 ? d.title.slice(0,18)+'…' : d.title),
+        datasets: [{ label: 'Студентов', data: data.map(d => d.cnt),
+          backgroundColor: 'rgba(123,94,167,0.6)', borderColor: '#7b5ea7', borderWidth: 1 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#94a3b8', font:{size:10} }, grid: { color: '#2a2a45' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#2a2a45' } }
+        }
+      }
+    });
+  });
+</script>
+{% endblock %}

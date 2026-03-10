@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Запись на курс{% endblock %}
+{% block page_title %}➕ Запись на курс{% endblock %}
+{% block content %}
+<div class="page-header">
+  <p>Выберите курс из списка и нажмите «Записаться». Уже записанные курсы отмечены ✓</p>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+  {% for c in courses %}
+  {% set is_enrolled = c.id in enrolled_ids %}
+  <div style="background:var(--card);border:1px solid {% if is_enrolled %}rgba(74,222,128,0.3){% else %}var(--border){% endif %};border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;transition:transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform=''">
+    <div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <h3 style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--white)">{{ c.title }}</h3>
+        {% if is_enrolled %}<span class="badge badge-green">✓ Записан</span>{% endif %}
+      </div>
+      {% if c.description %}<p style="color:var(--sub);font-size:0.83rem;margin-top:6px;line-height:1.5">{{ c.description[:120] }}{% if c.description|length>120 %}…{% endif %}</p>{% endif %}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      {% if c.teacher %}<span class="badge badge-purple">🎓 {{ c.teacher }}</span>{% endif %}
+      <span class="badge badge-blue">{{ c.enrolled }}/{{ c.max_students }} студентов</span>
+    </div>
+    <div class="progress" style="margin-top:auto"><div class="progress-bar blue" style="width:{{ [(c.enrolled/c.max_students*100)|int, 100]|min }}%"></div></div>
+    {% if not is_enrolled %}
+    <form method="post">
+      <input type="hidden" name="course_id" value="{{ c.id }}">
+      <button class="btn btn-success" type="submit" style="width:100%">➕ Записаться</button>
+    </form>
+    {% else %}
+    <button class="btn btn-ghost" style="width:100%;cursor:default" disabled>✓ Уже записан</button>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">📭</div><p>Нет доступных курсов</p></div>
+  {% endfor %}
+</div>
+{% endblock %}
