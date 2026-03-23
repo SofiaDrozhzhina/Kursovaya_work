@@ -2,59 +2,105 @@
 {% block title %}Оценки{% endblock %}
 {% block page_title %}⭐ Оценки{% endblock %}
 {% block content %}
+
 <div class="table-wrap">
-  <div class="table-header"><div class="table-title">Оценки студентов</div></div>
+  <div class="table-header">
+    <div class="table-title">Оценки студентов</div>
+    <div style="color:var(--sub);font-size:0.82rem">Оценки от 0 до 100 баллов</div>
+  </div>
   <div class="table-responsive">
     <table>
-      <thead><tr><th>Студент</th><th>Курс</th><th>Оценка</th><th>Статус</th><th>Дата</th><th>Комментарий</th><th>Действие</th></tr></thead>
+      <thead>
+      <tr>
+        <th>Студент</th><th>Курс</th><th>Оценка</th>
+        <th>Уровень</th><th>Статус</th><th>Дата</th><th>Комментарий</th><th>Действие</th>
+      </tr>
+      </thead>
       <tbody>
-        {% for r in rows %}
-        <tr>
-          <td><strong>{{ r.student }}</strong></td>
-          <td>{{ r.course }}</td>
-          <td>
-            {% if r.grade is not none %}
-            <strong style="color:{% if r.grade>=75 %}var(--green){% elif r.grade>=60 %}var(--yellow){% else %}var(--red){% endif %}">{{ r.grade }}</strong>
-            {% else %}<span class="badge badge-gray">Нет оценки</span>{% endif %}
-          </td>
-          <td>
-            {% if r.status=='completed' %}<span class="badge badge-green">Завершён</span>
-            {% elif r.status=='active' %}<span class="badge badge-blue">Активен</span>
-            {% else %}<span class="badge badge-gray">{{ r.status }}</span>{% endif %}
-          </td>
-          <td class="td-sub">{{ r.graded_at.strftime('%d.%m.%Y') if r.graded_at else '—' }}</td>
-          <td class="td-sub">{{ r.comment or '' }}</td>
-          <td>
-            <button class="btn btn-ghost btn-sm" onclick="openGradeModal({{ r.id }}, '{{ r.student|replace("'","") }}', '{{ r.course|replace("'","") }}', {{ r.grade if r.grade is not none else 'null' }}, '{{ r.comment|replace("'","") if r.comment else "" }}')">
-              {% if r.grade is not none %}✎ Изменить{% else %}✚ Выставить{% endif %}
-            </button>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--sub);padding:32px">Нет данных</td></tr>
-        {% endfor %}
+      {% for r in rows %}
+      <tr>
+        <td><strong>{{ r.student }}</strong></td>
+        <td>{{ r.course }}</td>
+        <td>
+          {% if r.grade is not none %}
+          <strong style="font-size:1.05rem;color:
+                {% if r.grade >= 90 %}var(--green)
+                {% elif r.grade >= 75 %}var(--accent2)
+                {% elif r.grade >= 60 %}var(--yellow)
+                {% else %}var(--red){% endif %}">
+            {{ r.grade }}
+          </strong>
+          {% else %}
+          <span class="badge badge-gray">Нет оценки</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.grade is not none %}
+          {% if r.grade >= 90 %}<span class="badge badge-green">Отлично</span>
+          {% elif r.grade >= 75 %}<span class="badge badge-blue">Хорошо</span>
+          {% elif r.grade >= 60 %}<span class="badge badge-yellow">Удовл.</span>
+          {% else %}<span class="badge badge-red">Неудовл.</span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if r.status == 'completed' %}<span class="badge badge-green">Завершён</span>
+          {% elif r.status == 'active' %}<span class="badge badge-blue">Активен</span>
+          {% else %}<span class="badge badge-gray">{{ r.status }}</span>{% endif %}
+        </td>
+        <td class="td-sub">{{ r.graded_at.strftime('%d.%m.%Y') if r.graded_at else '—' }}</td>
+        <td class="td-sub" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ r.comment or '' }}
+        </td>
+        <td>
+          <button class="btn btn-ghost btn-sm"
+                  onclick="openGradeModal(
+                {{ r.id }},
+                '{{ r.student|replace("'","\\'") }}',
+          '{{ r.course|replace("'","\\'") }}',
+          {{ r.grade if r.grade is not none else 'null' }},
+          '{{ (r.comment or '')|replace("'","\\'")|replace('"','\\"') }}'
+          )">
+          {% if r.grade is not none %}✎ Изменить{% else %}✚ Выставить{% endif %}
+          </button>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="8" style="text-align:center;color:var(--sub);padding:32px">Нет данных</td>
+      </tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
+<!-- Модальное окно оценки -->
 <div class="modal-overlay" id="gradeModal">
   <div class="modal">
-    <div class="modal-title">⭐ Выставить оценку</div>
-    <p id="gm_info" style="color:var(--sub);font-size:0.88rem;margin-bottom:20px"></p>
-    <form method="post" action="{{ url_for('set_grade') }}">
+    <div class="modal-title">⭐ Выставить / изменить оценку</div>
+    <div style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.88rem">
+      <div style="color:var(--sub)">Студент</div>
+      <div style="font-weight:600;color:var(--text)" id="gm_student"></div>
+      <div style="color:var(--sub);margin-top:6px">Курс</div>
+      <div style="font-weight:600;color:var(--text)" id="gm_course"></div>
+    </div>
+    <form method="post" action="{{ url_for('set_grade') }}" onsubmit="return validateGrade()">
       <input type="hidden" name="enrollment_id" id="gm_eid">
       <div class="form-group">
-        <label>Оценка (0–100)</label>
-        <input type="number" name="grade" id="gm_grade" min="0" max="100" step="0.1" required>
+        <label>Оценка * (от 0 до 100)</label>
+        <input type="number" name="grade" id="gm_grade"
+               min="0" max="100" step="0.1"
+               placeholder="Например: 85.5" required>
+        <div id="grade_preview" style="margin-top:6px;font-size:0.82rem;color:var(--sub)"></div>
       </div>
       <div class="form-group">
         <label>Комментарий</label>
-        <textarea name="comment" id="gm_comment" rows="2"></textarea>
+        <textarea name="comment" id="gm_comment" rows="2"
+                  placeholder="Необязательно: краткий комментарий к оценке"></textarea>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="closeModal('gradeModal')">Отмена</button>
-        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <button type="submit" class="btn btn-primary">💾 Сохранить оценку</button>
       </div>
     </form>
   </div>
@@ -63,12 +109,41 @@
 
 {% block extra_js %}
 <script>
-function openGradeModal(eid, student, course, grade, comment) {
-  document.getElementById('gm_eid').value = eid;
-  document.getElementById('gm_info').textContent = `Студент: ${student} | Курс: ${course}`;
-  document.getElementById('gm_grade').value = grade !== null ? grade : '';
-  document.getElementById('gm_comment').value = comment;
-  openModal('gradeModal');
-}
+  function openGradeModal(eid, student, course, grade, comment) {
+    document.getElementById('gm_eid').value      = eid;
+    document.getElementById('gm_student').textContent = student;
+    document.getElementById('gm_course').textContent  = course;
+    document.getElementById('gm_grade').value   = grade !== null ? grade : '';
+    document.getElementById('gm_comment').value = comment;
+    updateGradePreview(grade);
+    openModal('gradeModal');
+  }
+
+  function updateGradePreview(val) {
+    const preview = document.getElementById('grade_preview');
+    if (val === null || val === '' || isNaN(val)) { preview.textContent = ''; return; }
+    const v = parseFloat(val);
+    let label, color;
+    if (v >= 90)      { label = '✅ Отлично';           color = 'var(--green)'; }
+    else if (v >= 75) { label = '🔵 Хорошо';            color = 'var(--accent2)'; }
+    else if (v >= 60) { label = '🟡 Удовлетворительно'; color = 'var(--yellow)'; }
+    else              { label = '🔴 Неудовлетворительно'; color = 'var(--red)'; }
+    preview.innerHTML = `<span style="color:${color};font-weight:600">${label}</span>`;
+  }
+
+  document.getElementById('gm_grade')?.addEventListener('input', function() {
+    updateGradePreview(this.value);
+  });
+
+  function validateGrade() {
+    const g = parseFloat(document.getElementById('gm_grade').value);
+    if (isNaN(g) || g < 0 || g > 100) {
+      alert('Оценка должна быть числом от 0 до 100.');
+      return false;
+    }
+    const student = document.getElementById('gm_student').textContent;
+    const course  = document.getElementById('gm_course').textContent;
+    return confirm(`Сохранить оценку ${g} для студента «${student}»\nпо курсу «${course}»?`);
+  }
 </script>
 {% endblock %}

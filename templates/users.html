@@ -2,66 +2,147 @@
 {% block title %}Пользователи{% endblock %}
 {% block page_title %}👥 Пользователи{% endblock %}
 {% block content %}
+
 <div class="table-wrap">
   <div class="table-header">
     <div class="table-title">Все пользователи системы</div>
-    <button class="btn btn-success" onclick="openModal('addModal')">✚ Добавить</button>
+    <button class="btn btn-success" onclick="openModal('addModal')">✚ Добавить пользователя</button>
   </div>
   <div class="table-responsive">
     <table>
-      <thead><tr><th>ID</th><th>Логин</th><th>Имя</th><th>Email</th><th>Роль</th><th>Дата регистрации</th><th>Действия</th></tr></thead>
+      <thead>
+      <tr>
+        <th>ID</th><th>Логин</th><th>Имя</th><th>Email</th>
+        <th>Роль</th><th>Дата регистрации</th><th>Действия</th>
+      </tr>
+      </thead>
       <tbody>
-        {% for r in rows %}
-        <tr>
-          <td class="td-sub">{{ r.id }}</td>
-          <td><strong>{{ r.username }}</strong></td>
-          <td>{{ r.full_name or '—' }}</td>
-          <td class="td-sub">{{ r.email or '—' }}</td>
-          <td>
-            {% if r.role=='admin' %}<span class="badge badge-yellow">👑 Администратор</span>
-            {% elif r.role=='teacher' %}<span class="badge badge-blue">🎓 Преподаватель</span>
-            {% else %}<span class="badge badge-purple">🎒 Студент</span>{% endif %}
-          </td>
-          <td class="td-sub">{{ r.created_at.strftime('%d.%m.%Y') if r.created_at else '—' }}</td>
-          <td>
-            {% if r.id != session.get('user_id') %}
-            <form method="post" action="{{ url_for('delete_user', uid=r.id) }}" style="display:inline" onsubmit="return confirm('Удалить пользователя?')">
-              <button class="btn btn-danger btn-sm" type="submit">🗑 Удалить</button>
-            </form>
-            {% else %}
-            <span class="badge badge-gray">Вы</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="7" style="text-align:center;color:var(--sub);padding:32px">Нет пользователей</td></tr>
-        {% endfor %}
+      {% for r in rows %}
+      <tr>
+        <td class="td-sub">{{ r.id }}</td>
+        <td><strong>{{ r.username }}</strong></td>
+        <td>{{ r.full_name or '—' }}</td>
+        <td class="td-sub">{{ r.email or '—' }}</td>
+        <td>
+          {% if r.role == 'admin' %}<span class="badge badge-yellow">👑 Администратор</span>
+          {% elif r.role == 'teacher' %}<span class="badge badge-blue">🎓 Преподаватель</span>
+          {% else %}<span class="badge badge-purple">🎒 Студент</span>{% endif %}
+        </td>
+        <td class="td-sub">{{ r.created_at.strftime('%d.%m.%Y') if r.created_at else '—' }}</td>
+        <td>
+          {% if r.id == session.get('user_id') %}
+          <span class="badge badge-gray">Это вы</span>
+          {% elif r.role == 'admin' %}
+          <span class="badge badge-gray" title="Администратора нельзя удалить">🔒 Защищён</span>
+          {% else %}
+          <button class="btn btn-danger btn-sm"
+                  onclick="confirmDelete({{ r.id }}, '{{ r.full_name|replace("'","\\'") or r.username }}')">
+          🗑 Удалить
+          </button>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" style="text-align:center;color:var(--sub);padding:32px">Нет пользователей</td>
+      </tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
+<!-- Скрытая форма для удаления -->
+<form id="deleteForm" method="post" action="" style="display:none"></form>
+
+<!-- Модальное окно: добавить пользователя -->
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-title">✚ Добавить пользователя</div>
-    <form method="post" action="{{ url_for('add_user') }}">
-      <div class="form-group"><label>Полное имя</label><input type="text" name="full_name"></div>
-      <div class="form-group"><label>Логин *</label><input type="text" name="username" required></div>
-      <div class="form-group"><label>Email</label><input type="email" name="email"></div>
-      <div class="form-group"><label>Пароль *</label><input type="password" name="password" required></div>
+    <form method="post" action="{{ url_for('add_user') }}" onsubmit="return validateAddUser()">
+      <div class="form-group">
+        <label>Полное имя *</label>
+        <input type="text" name="full_name" id="au_name" placeholder="Иванов Иван Иванович" required>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Логин * (мин. 3 символа)</label>
+          <input type="text" name="username" id="au_login" placeholder="ivan_ivanov" required>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="email" id="au_email" placeholder="ivan@example.ru">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Пароль * (мин. 6 символов)</label>
+        <input type="password" name="password" id="au_pass" placeholder="••••••••" required>
+      </div>
       <div class="form-group">
         <label>Роль</label>
-        <select name="role">
+        <select name="role" id="au_role">
           <option value="student">🎒 Студент</option>
           <option value="teacher">🎓 Преподаватель</option>
+          {% set admin_exists = rows | selectattr('role','equalto','admin') | list | length > 0 %}
+          {% if not admin_exists %}
           <option value="admin">👑 Администратор</option>
+          {% endif %}
         </select>
+        {% if rows | selectattr('role','equalto','admin') | list | length > 0 %}
+        <small style="color:var(--sub);font-size:0.75rem;margin-top:4px;display:block">
+          ⚠️ Добавление второго администратора недоступно — в системе уже есть администратор.
+        </small>
+        {% endif %}
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="closeModal('addModal')">Отмена</button>
-        <button type="submit" class="btn btn-primary">Создать</button>
+        <button type="submit" class="btn btn-primary">Создать пользователя</button>
       </div>
     </form>
   </div>
 </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Подтверждение удаления пользователя
+  function confirmDelete(uid, name) {
+    if (confirm(`Удалить пользователя «${name}»?\n\nЭто действие необратимо. Все связанные данные (курсы, оценки) будут удалены.`)) {
+      const form = document.getElementById('deleteForm');
+      form.action = `/users/delete/${uid}`;
+      form.submit();
+    }
+  }
+
+  // Валидация формы добавления
+  function validateAddUser() {
+    const name  = document.getElementById('au_name').value.trim();
+    const login = document.getElementById('au_login').value.trim();
+    const pass  = document.getElementById('au_pass').value;
+    const email = document.getElementById('au_email').value.trim();
+
+    if (!name) {
+      alert('Введите полное имя пользователя.');
+      return false;
+    }
+    if (login.length < 3) {
+      alert('Логин должен содержать минимум 3 символа.');
+      return false;
+    }
+    if (!/^[a-zA-Z0-9_.-]+$/.test(login)) {
+      alert('Логин может содержать только латинские буквы, цифры, точку, дефис и подчёркивание.');
+      return false;
+    }
+    if (pass.length < 6) {
+      alert('Пароль должен содержать минимум 6 символов.');
+      return false;
+    }
+    if (email && !email.includes('@')) {
+      alert('Введите корректный email адрес.');
+      return false;
+    }
+    return true;
+  }
+</script>
 {% endblock %}

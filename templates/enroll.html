@@ -3,36 +3,82 @@
 {% block page_title %}➕ Запись на курс{% endblock %}
 {% block content %}
 <div class="page-header">
-  <p>Выберите курс из списка и нажмите «Записаться». Уже записанные курсы отмечены ✓</p>
+  <p>Выберите курс из списка и нажмите «Записаться». Уже записанные курсы отмечены ✓. Курсы без свободных мест недоступны для записи.</p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
   {% for c in courses %}
   {% set is_enrolled = c.id in enrolled_ids %}
-  <div style="background:var(--card);border:1px solid {% if is_enrolled %}rgba(74,222,128,0.3){% else %}var(--border){% endif %};border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;transition:transform 0.2s;" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform=''">
+  {% set is_full = c.enrolled >= c.max_students %}
+
+  <div style="background:var(--card);
+    border:1px solid {% if is_enrolled %}rgba(74,222,128,0.3){% elif is_full %}rgba(248,113,113,0.25){% else %}var(--border){% endif %};
+    border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;
+    opacity:{% if is_full and not is_enrolled %}0.75{% else %}1{% endif %};
+    transition:transform 0.2s;"
+       {% if not is_full and not is_enrolled %}
+       onmouseenter="this.style.transform='translateY(-2px)'"
+       onmouseleave="this.style.transform=''"
+       {% endif %}
+  >
     <div>
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-        <h3 style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--white)">{{ c.title }}</h3>
-        {% if is_enrolled %}<span class="badge badge-green">✓ Записан</span>{% endif %}
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <h3 style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--text)">{{ c.title }}</h3>
+        {% if is_enrolled %}
+        <span class="badge badge-green">✓ Записан</span>
+        {% elif is_full %}
+        <span class="badge badge-red">🔒 Мест нет</span>
+        {% endif %}
       </div>
-      {% if c.description %}<p style="color:var(--sub);font-size:0.83rem;margin-top:6px;line-height:1.5">{{ c.description[:120] }}{% if c.description|length>120 %}…{% endif %}</p>{% endif %}
+      {% if c.description %}
+      <p style="color:var(--sub);font-size:0.83rem;margin-top:6px;line-height:1.5">
+        {{ c.description[:120] }}{% if c.description|length > 120 %}…{% endif %}
+      </p>
+      {% endif %}
     </div>
+
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       {% if c.teacher %}<span class="badge badge-purple">🎓 {{ c.teacher }}</span>{% endif %}
-      <span class="badge badge-blue">{{ c.enrolled }}/{{ c.max_students }} студентов</span>
+      <span class="badge {% if is_full %}badge-red{% else %}badge-blue{% endif %}">
+        {{ c.enrolled }}/{{ c.max_students }} студентов
+      </span>
     </div>
-    <div class="progress" style="margin-top:auto"><div class="progress-bar blue" style="width:{{ [(c.enrolled/c.max_students*100)|int, 100]|min }}%"></div></div>
-    {% if not is_enrolled %}
-    <form method="post">
-      <input type="hidden" name="course_id" value="{{ c.id }}">
-      <button class="btn btn-success" type="submit" style="width:100%">➕ Записаться</button>
-    </form>
-    {% else %}
+
+    <!-- Прогресс-бар заполненности -->
+    <div class="progress" style="margin-top:auto">
+      <div class="progress-bar {% if is_full %}red{% else %}blue{% endif %}"
+           style="width:{{ [(c.enrolled / c.max_students * 100)|int, 100]|min }}%">
+      </div>
+    </div>
+
+    <!-- Кнопка действия -->
+    {% if is_enrolled %}
     <button class="btn btn-ghost" style="width:100%;cursor:default" disabled>✓ Уже записан</button>
+    {% elif is_full %}
+    <button class="btn btn-danger" style="width:100%;cursor:not-allowed;opacity:0.6" disabled>
+      🔒 Набор завершён
+    </button>
+    {% else %}
+    <form method="post" onsubmit="return confirmEnroll('{{ c.title|replace("'", "\\'") }}')">
+    <input type="hidden" name="course_id" value="{{ c.id }}">
+    <button class="btn btn-success" type="submit" style="width:100%">➕ Записаться</button>
+    </form>
     {% endif %}
   </div>
+
   {% else %}
-  <div class="empty-state"><div class="empty-icon">📭</div><p>Нет доступных курсов</p></div>
+  <div class="empty-state">
+    <div class="empty-icon">📭</div>
+    <p>Нет доступных курсов</p>
+  </div>
   {% endfor %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function confirmEnroll(title) {
+    return confirm(`Записаться на курс «${title}»?\n\nПосле записи курс появится в разделе «Мои курсы».`);
+  }
+</script>
 {% endblock %}

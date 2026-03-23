@@ -31,7 +31,7 @@ DB_CONFIG = {
     "port":     int(os.environ.get("DB_PORT", 5432)),
     "dbname":   os.environ.get("DB_NAME",     "courses_db"),
     "user":     os.environ.get("DB_USER",     "postgres"),
-    "password": os.environ.get("DB_PASSWORD", "1234"),
+    "password": os.environ.get("DB_PASSWORD", "postgres"),
 }
 
 def get_db():
@@ -124,10 +124,16 @@ def register():
 
         if not username or not password or not full_name:
             flash("Заполните все обязательные поля.", "error")
+        elif len(username) < 3:
+            flash("Логин должен содержать минимум 3 символа.", "error")
         elif password != password2:
             flash("Пароли не совпадают.", "error")
         elif len(password) < 6:
             flash("Пароль должен быть не менее 6 символов.", "error")
+        elif email and "@" not in email:
+            flash("Введите корректный email.", "error")
+        elif role not in ("student", "teacher"):
+            flash("Недопустимая роль.", "error")
         else:
             existing = query("SELECT id FROM users WHERE username=%s", (username,), fetchone=True)
             if existing:
@@ -230,22 +236,41 @@ def add_user():
     email     = request.form.get("email", "").strip()
     password  = request.form.get("password", "")
     role      = request.form.get("role", "student")
-    if not username or not password:
-        flash("Логин и пароль обязательны.", "error")
+
+    # Валидация
+    if not username or not password or not full_name:
+        flash("Логин, имя и пароль обязательны.", "error")
+        return redirect(url_for("users"))
+    if len(username) < 3:
+        flash("Логин должен содержать минимум 3 символа.", "error")
+        return redirect(url_for("users"))
+    if len(password) < 6:
+        flash("Пароль должен содержать минимум 6 символов.", "error")
+        return redirect(url_for("users"))
+    if email and "@" not in email:
+        flash("Введите корректный email.", "error")
+        return redirect(url_for("users"))
+
+    # Администратор должен быть только один
+    if role == "admin":
+        existing_admin = query("SELECT id FROM users WHERE role='admin'", fetchone=True)
+        if existing_admin:
+            flash("В системе уже есть администратор. Допускается только один администратор.", "error")
+            return redirect(url_for("users"))
+
+    existing = query("SELECT id FROM users WHERE username=%s", (username,), fetchone=True)
+    if existing:
+        flash(f"Логин «{username}» уже занят.", "error")
     else:
-        existing = query("SELECT id FROM users WHERE username=%s", (username,), fetchone=True)
-        if existing:
-            flash(f"Логин «{username}» уже занят.", "error")
-        else:
-            query("INSERT INTO users (username,password,role,full_name,email) VALUES (%s,%s,%s,%s,%s)",
-                  (username, generate_password_hash(password), role, full_name, email), commit=True)
-            uid = query("SELECT id FROM users WHERE username=%s", (username,), fetchone=True)["id"]
-            if role == "teacher":
-                query("INSERT INTO teachers (user_id) VALUES (%s)", (uid,), commit=True)
-            elif role == "student":
-                query("INSERT INTO students (user_id, enrollment_year) VALUES (%s,%s)",
-                      (uid, datetime.now().year), commit=True)
-            flash("Пользователь добавлен.", "success")
+        query("INSERT INTO users (username,password,role,full_name,email) VALUES (%s,%s,%s,%s,%s)",
+              (username, generate_password_hash(password), role, full_name, email), commit=True)
+        uid = query("SELECT id FROM users WHERE username=%s", (username,), fetchone=True)["id"]
+        if role == "teacher":
+            query("INSERT INTO teachers (user_id) VALUES (%s)", (uid,), commit=True)
+        elif role == "student":
+            query("INSERT INTO students (user_id, enrollment_year) VALUES (%s,%s)",
+                  (uid, datetime.now().year), commit=True)
+        flash(f"Пользователь «{full_name}» успешно добавлен.", "success")
     return redirect(url_for("users"))
 
 # ─── Students ───────────────────────────────────────────────────────────────
@@ -275,14 +300,32 @@ def students():
 @login_required
 @role_required("admin")
 def edit_student(sid):
-    query("""
-        UPDATE students SET group_name=%s, enrollment_year=%s WHERE id=%s
-    """, (request.form.get("group_name"), request.form.get("enrollment_year") or None, sid), commit=True)
-    query("""
-        UPDATE users SET full_name=%s, email=%s
-        WHERE id=(SELECT user_id FROM students WHERE id=%s)
-    """, (request.form.get("full_name"), request.form.get("email"), sid), commit=True)
-    flash("Данные студента обновлены.", "success")
+    full_name = request.form.get("full_name", "").strip()
+    email     = request.form.get("email", "").strip()
+    group     = request.form.get("group_name", "").strip()
+    year_raw  = request.form.get("enrollment_year", "").strip()
+
+    if not full_name:
+        flash("Имя студента не может быть пустым.", "error")
+        return redirect(url_for("students"))
+    if email and "@" not in email:
+        flash("Введите корректный email.", "error")
+        return redirect(url_for("students"))
+    year = None
+    if year_raw:
+        try:
+            year = int(year_raw)
+            if year < 2000 or year > datetime.now().year:
+                raise ValueError
+        except ValueError:
+            flash(f"Год поступления должен быть числом от 2000 до {datetime.now().year}.", "error")
+            return redirect(url_for("students"))
+
+    query("UPDATE students SET group_name=%s, enrollment_year=%s WHERE id=%s",
+          (group or None, year, sid), commit=True)
+    query("UPDATE users SET full_name=%s, email=%s WHERE id=(SELECT user_id FROM students WHERE id=%s)",
+          (full_name, email or None, sid), commit=True)
+    flash("Данные студента успешно обновлены.", "success")
     return redirect(url_for("students"))
 
 # ─── Teachers ───────────────────────────────────────────────────────────────
@@ -344,16 +387,32 @@ def courses():
 @login_required
 @role_required("admin")
 def add_course():
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Название курса обязательно.", "error")
+        return redirect(url_for("courses"))
+    if len(title) < 3:
+        flash("Название курса должно содержать минимум 3 символа.", "error")
+        return redirect(url_for("courses"))
+    max_s_raw = request.form.get("max_students", "30")
+    try:
+        max_s = int(max_s_raw)
+        if max_s < 1 or max_s > 500:
+            raise ValueError
+    except ValueError:
+        flash("Максимальное количество студентов должно быть числом от 1 до 500.", "error")
+        return redirect(url_for("courses"))
+
     query("""
         INSERT INTO courses (title, description, teacher_id, max_students)
         VALUES (%s,%s,%s,%s)
     """, (
-        request.form.get("title"),
-        request.form.get("description"),
+        title,
+        request.form.get("description", "").strip() or None,
         request.form.get("teacher_id") or None,
-        request.form.get("max_students") or 30
+        max_s
     ), commit=True)
-    flash("Курс добавлен.", "success")
+    flash(f"Курс «{title}» успешно добавлен.", "success")
     return redirect(url_for("courses"))
 
 @app.route("/courses/<int:cid>/edit", methods=["POST"])
@@ -418,9 +477,28 @@ def grades():
 @login_required
 @role_required("admin", "teacher")
 def set_grade():
-    eid     = int(request.form.get("enrollment_id"))
-    grade   = float(request.form.get("grade"))
-    comment = request.form.get("comment", "")
+    eid_raw   = request.form.get("enrollment_id", "")
+    grade_raw = request.form.get("grade", "")
+    comment   = request.form.get("comment", "").strip()
+
+    if not eid_raw or not grade_raw:
+        flash("Заполните все обязательные поля.", "error")
+        return redirect(url_for("grades"))
+    try:
+        eid   = int(eid_raw)
+        grade = float(grade_raw.replace(",", "."))
+        if grade < 0 or grade > 100:
+            raise ValueError
+    except ValueError:
+        flash("Оценка должна быть числом от 0 до 100.", "error")
+        return redirect(url_for("grades"))
+
+    # Проверяем что запись существует
+    enrollment = query("SELECT id FROM enrollments WHERE id=%s", (eid,), fetchone=True)
+    if not enrollment:
+        flash("Запись на курс не найдена.", "error")
+        return redirect(url_for("grades"))
+
     query("""
         INSERT INTO grades (enrollment_id, grade, comment, graded_at)
         VALUES (%s,%s,%s,NOW())
@@ -428,7 +506,7 @@ def set_grade():
         SET grade=EXCLUDED.grade, comment=EXCLUDED.comment, graded_at=NOW()
     """, (eid, grade, comment), commit=True)
     query("UPDATE enrollments SET status='completed' WHERE id=%s", (eid,), commit=True)
-    flash("Оценка сохранена.", "success")
+    flash(f"Оценка {grade} успешно сохранена.", "success")
     return redirect(url_for("grades"))
 
 # ─── Statistics ──────────────────────────────────────────────────────────────
@@ -548,14 +626,31 @@ def enroll():
 
     if request.method == "POST":
         cid = int(request.form.get("course_id"))
+
+        # Проверка: существует ли курс
+        course = query("SELECT id, title, max_students FROM courses WHERE id=%s", (cid,), fetchone=True)
+        if not course:
+            flash("Курс не найден.", "error")
+            return redirect(url_for("enroll"))
+
+        # Проверка: уже записан
         existing = query("SELECT id FROM enrollments WHERE student_id=%s AND course_id=%s",
                          (sid, cid), fetchone=True)
         if existing:
             flash("Вы уже записаны на этот курс.", "error")
-        else:
-            query("INSERT INTO enrollments (student_id, course_id) VALUES (%s,%s)",
-                  (sid, cid), commit=True)
-            flash("Вы успешно записались на курс!", "success")
+            return redirect(url_for("enroll"))
+
+        # Проверка: не превышен ли лимит мест
+        enrolled_count = query(
+            "SELECT COUNT(*) AS n FROM enrollments WHERE course_id=%s", (cid,), fetchone=True
+        )["n"]
+        if enrolled_count >= course["max_students"]:
+            flash(f"К сожалению, курс «{course['title']}» уже набрал максимальное количество участников ({course['max_students']}).", "error")
+            return redirect(url_for("enroll"))
+
+        query("INSERT INTO enrollments (student_id, course_id) VALUES (%s,%s)",
+              (sid, cid), commit=True)
+        flash(f"Вы успешно записались на курс «{course['title']}»!", "success")
         return redirect(url_for("enroll"))
 
     enrolled_ids = {r["course_id"] for r in query(
