@@ -19,7 +19,7 @@ DB_CONFIG = {
     "port":     5432,
     "dbname":   "courses_db",
     "user":     "postgres",
-    "password": "postgres",   # ← измените на свой пароль
+    "password": "1234",   # ← измените на свой пароль
 }
 
 def seed():

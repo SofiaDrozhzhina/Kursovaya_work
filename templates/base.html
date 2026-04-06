@@ -300,6 +300,9 @@
     <a href="{{ url_for('statistics') }}" class="nav-item {% if request.endpoint=='statistics' %}active{% endif %}">
       <span class="nav-icon">📈</span> Статистика
     </a>
+    <a href="{{ url_for('admin_documents') }}" class="nav-item {% if request.endpoint=='admin_documents' %}active{% endif %}">
+      <span class="nav-icon">📁</span> Документы
+    </a>
     {% endif %}
 
     {% if role in ['student','teacher'] %}
@@ -307,12 +310,21 @@
     <a href="{{ url_for('my_courses') }}" class="nav-item {% if request.endpoint=='my_courses' %}active{% endif %}">
       <span class="nav-icon">📖</span> Мои курсы
     </a>
+    {% if role == 'teacher' %}
+    <a href="{{ url_for('download_gradebook_excel') }}" class="nav-item"
+       onclick="return confirm('Скачать журнал успеваемости своих курсов в Excel?')">
+      <span class="nav-icon">📊</span> Журнал (.xlsx)
+    </a>
+    {% endif %}
     {% if role == 'student' %}
     <a href="{{ url_for('enroll') }}" class="nav-item {% if request.endpoint=='enroll' %}active{% endif %}">
       <span class="nav-icon">➕</span> Запись на курс
     </a>
     <a href="{{ url_for('my_grades') }}" class="nav-item {% if request.endpoint=='my_grades' %}active{% endif %}">
       <span class="nav-icon">⭐</span> Мои оценки
+    </a>
+    <a href="{{ url_for('documents') }}" class="nav-item {% if request.endpoint=='documents' %}active{% endif %}">
+      <span class="nav-icon">📄</span> Мои документы
     </a>
     {% endif %}
     {% endif %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Документы — Администратор{% endblock %}
+{% block page_title %}📁 Документы и отчёты{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>📁 Документы и отчёты</h1>
+  <p>Скачивайте документы студентов, журнал успеваемости и системные отчёты</p>
+</div>
+
+<!-- Статистика -->
+<div class="stat-grid" style="margin-bottom:28px">
+  <div class="stat-card purple"><div class="stat-icon">🎒</div><div class="stat-value">{{ stats.students }}</div><div class="stat-label">Студентов</div></div>
+  <div class="stat-card blue"><div class="stat-icon">🎓</div><div class="stat-value">{{ stats.teachers }}</div><div class="stat-label">Преподавателей</div></div>
+  <div class="stat-card green"><div class="stat-icon">📖</div><div class="stat-value">{{ stats.courses }}</div><div class="stat-label">Курсов</div></div>
+  <div class="stat-card yellow"><div class="stat-icon">⭐</div><div class="stat-value">{{ stats.grades }}</div><div class="stat-label">Оценок выставлено</div></div>
+</div>
+
+<!-- Системные документы -->
+<div class="section-title">📊 Системные отчёты</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:32px">
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:2rem">📊</span>
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.95rem;color:var(--text)">Журнал успеваемости</div>
+        <div style="font-size:0.75rem;color:var(--sub)">Все студенты, курсы, оценки</div>
+      </div>
+    </div>
+    <p style="color:var(--sub);font-size:0.82rem">Excel-файл со всеми записями на курсы и оценками по всем преподавателям.</p>
+    <div style="display:flex;gap:6px"><span class="badge badge-green">📗 .xlsx</span><span class="badge badge-gray">{{ stats.grades }} оценок</span></div>
+    <a href="{{ url_for('download_gradebook_excel') }}"
+       class="btn btn-success" style="justify-content:center"
+       onclick="return confirm('Скачать журнал успеваемости всех студентов в Excel?')">
+      ⬇ Скачать журнал (.xlsx)
+    </a>
+  </div>
+
+</div>
+
+<!-- Документы по студентам -->
+<div class="section-title">🎒 Документы студентов</div>
+<div class="table-wrap">
+  <div class="table-header">
+    <div class="table-title">Выберите студента для скачивания документов</div>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead>
+      <tr><th>Студент</th><th>Группа</th><th>Год</th><th>Курсов</th><th>Ср. балл</th><th>Согласие на ПД</th><th>Справка об обучении</th></tr>
+      </thead>
+      <tbody>
+      {% for s in students_list %}
+      <tr>
+        <td><strong>{{ s.full_name }}</strong></td>
+        <td>{% if s.group_name %}<span class="badge badge-blue">{{ s.group_name }}</span>{% else %}—{% endif %}</td>
+        <td class="td-sub">{{ s.enrollment_year or '—' }}</td>
+        <td><span class="badge badge-purple">{{ s.courses }}</span></td>
+        <td>
+          {% if s.avg_grade %}
+          <strong style="color:{% if s.avg_grade>=75 %}var(--green){% elif s.avg_grade>=60 %}var(--yellow){% else %}var(--red){% endif %}">
+            {{ s.avg_grade }}
+          </strong>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('admin_download_consent', student_id=s.id) }}"
+             class="btn btn-ghost btn-sm"
+             onclick="return confirm('Скачать согласие на обработку данных для «{{ s.full_name|replace("'","\\'") }}»?')">
+          📝 Скачать
+          </a>
+        </td>
+        <td>
+          <a href="{{ url_for('admin_download_study', student_id=s.id) }}"
+             class="btn btn-ghost btn-sm"
+             onclick="return confirm('Скачать справку об обучении для «{{ s.full_name|replace("'","\\'") }}»?')">
+          🏫 Скачать
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;color:var(--sub);padding:32px">Нет студентов</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div style="margin-top:20px;padding:14px 18px;background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--sub)">
+  ℹ️ Документы .docx открываются в Microsoft Word. Журнал .xlsx открывается в Microsoft Excel.
+  Для подписания и заверения справок обратитесь в учебный отдел.
+</div>
+{% endblock %}

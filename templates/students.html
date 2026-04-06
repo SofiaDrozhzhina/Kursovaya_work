@@ -16,54 +16,69 @@
   <div class="table-responsive">
     <table>
       <thead>
-        <tr>
-          <th>Имя</th><th>Логин</th><th>Группа</th><th>Год поступления</th>
-          <th>Курсов</th><th>Завершено</th><th>Средний балл</th>
-          {% if user.role == 'admin' %}<th>Действия</th>{% endif %}
-        </tr>
+      <tr>
+        <th>Имя</th><th>Группа</th><th>Год</th>
+        <th>Курсов</th><th>Завершено</th><th>Ср. балл</th>
+        {% if user.role == 'admin' %}<th>Действия</th>{% endif %}
+      </tr>
       </thead>
       <tbody>
-        {% for r in rows %}
-        <tr>
-          <td><strong>{{ r.full_name or '—' }}</strong><br><span class="td-sub">{{ r.email or '' }}</span></td>
-          <td class="td-sub">{{ r.username }}</td>
-          <td>{% if r.group_name %}<span class="badge badge-blue">{{ r.group_name }}</span>{% else %}—{% endif %}</td>
-          <td class="td-sub">{{ r.enrollment_year or '—' }}</td>
-          <td><span class="badge badge-purple">{{ r.total_courses }}</span></td>
-          <td><span class="badge badge-green">{{ r.completed }}</span></td>
-          <td>
-            {% if r.avg_grade %}
-            <strong style="color:{% if r.avg_grade>=75 %}var(--green){% elif r.avg_grade>=60 %}var(--yellow){% else %}var(--red){% endif %}">{{ r.avg_grade }}</strong>
-            {% else %}—{% endif %}
-          </td>
-          {% if user.role == 'admin' %}
-          <td>
-            <button class="btn btn-ghost btn-sm" onclick="openEditModal({{ r.id }}, '{{ r.full_name|replace("'","") }}', '{{ r.email or '' }}', '{{ r.group_name or '' }}', '{{ r.enrollment_year or '' }}')">✎ Изменить</button>
-          </td>
-          {% endif %}
-        </tr>
-        {% else %}
-        <tr><td colspan="8" style="text-align:center;color:var(--sub);padding:32px">Студенты не найдены</td></tr>
-        {% endfor %}
+      {% for r in rows %}
+      <tr>
+        <td>
+          <strong>{{ r.full_name or '—' }}</strong>
+          <br><span class="td-sub">{{ r.username }}</span>
+          {% if r.email %}<br><span class="td-sub">{{ r.email }}</span>{% endif %}
+        </td>
+        <td>{% if r.group_name %}<span class="badge badge-blue">{{ r.group_name }}</span>{% else %}—{% endif %}</td>
+        <td class="td-sub">{{ r.enrollment_year or '—' }}</td>
+        <td><span class="badge badge-purple">{{ r.total_courses }}</span></td>
+        <td><span class="badge badge-green">{{ r.completed }}</span></td>
+        <td>
+          {% if r.avg_grade %}
+          <strong style="color:{% if r.avg_grade>=75 %}var(--green){% elif r.avg_grade>=60 %}var(--yellow){% else %}var(--red){% endif %}">
+            {{ r.avg_grade }}
+          </strong>
+          {% else %}—{% endif %}
+        </td>
+        {% if user.role == 'admin' %}
+        <td style="white-space:nowrap">
+          <button class="btn btn-ghost btn-sm"
+                  onclick="openEditStudentModal({{ r.id }}, '{{ r.full_name|replace("'","\\'") }}', '{{ r.email or "" }}', '{{ r.group_name or "" }}', '{{ r.enrollment_year or "" }}')">
+          ✎
+          </button>
+          <button class="btn btn-danger btn-sm"
+                  onclick="confirmDeleteStudent({{ r.id }}, '{{ r.full_name|replace("'","\\'") }}')">
+          🗑
+          </button>
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="7" style="text-align:center;color:var(--sub);padding:32px">Студенты не найдены</td></tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<!-- Edit modal -->
+<!-- Скрытая форма удаления -->
+<form id="deleteStudentForm" method="post" action="" style="display:none"></form>
+
+<!-- Модалка редактирования -->
 {% if user.role == 'admin' %}
-<div class="modal-overlay" id="editModal">
+<div class="modal-overlay" id="editStudentModal">
   <div class="modal">
     <div class="modal-title">✎ Редактировать студента</div>
-    <form method="post" id="editForm" action="">
-      <div class="form-group"><label>Полное имя</label><input type="text" name="full_name" id="ef_name"></div>
-      <div class="form-group"><label>Email</label><input type="email" name="email" id="ef_email"></div>
-      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group"><label>Группа</label><input type="text" name="group_name" id="ef_group"></div>
-        <div class="form-group"><label>Год поступления</label><input type="number" name="enrollment_year" id="ef_year" min="2000" max="2099"></div>
+    <form method="post" id="editStudentForm" action="" onsubmit="return validateStudentForm()">
+      <div class="form-group"><label>Полное имя *</label><input type="text" name="full_name" id="esf_name" required></div>
+      <div class="form-group"><label>Email</label><input type="email" name="email" id="esf_email"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label>Группа</label><input type="text" name="group_name" id="esf_group" placeholder="ИС-21"></div>
+        <div class="form-group"><label>Год поступления</label><input type="number" name="enrollment_year" id="esf_year" min="2000" max="2030"></div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-ghost" onclick="closeModal('editModal')">Отмена</button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editStudentModal')">Отмена</button>
         <button type="submit" class="btn btn-primary">Сохранить</button>
       </div>
     </form>
@@ -74,13 +89,25 @@
 
 {% block extra_js %}
 <script>
-function openEditModal(id, name, email, group, year) {
-  document.getElementById('ef_name').value = name;
-  document.getElementById('ef_email').value = email;
-  document.getElementById('ef_group').value = group;
-  document.getElementById('ef_year').value = year;
-  document.getElementById('editForm').action = `/students/${id}/edit`;
-  openModal('editModal');
-}
+  function openEditStudentModal(id, name, email, group, year) {
+    document.getElementById('esf_name').value  = name;
+    document.getElementById('esf_email').value = email;
+    document.getElementById('esf_group').value = group;
+    document.getElementById('esf_year').value  = year;
+    document.getElementById('editStudentForm').action = `/students/${id}/edit`;
+    openModal('editStudentModal');
+  }
+  function validateStudentForm() {
+    const name = document.getElementById('esf_name').value.trim();
+    if (!name) { alert('Введите имя студента.'); return false; }
+    return true;
+  }
+  function confirmDeleteStudent(id, name) {
+    if (confirm(`Удалить студента «${name}»?\n\nБудут удалены все его записи на курсы и оценки. Это действие необратимо.`)) {
+      const f = document.getElementById('deleteStudentForm');
+      f.action = `/students/${id}/delete`;
+      f.submit();
+    }
+  }
 </script>
 {% endblock %}

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Мои документы{% endblock %}
+{% block page_title %}📄 Мои документы{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>📄 Мои документы</h1>
+  <p>Скачайте официальные документы в формате Word (.docx)</p>
+</div>
+
+<!-- Документы общего назначения -->
+<div style="margin-bottom:32px">
+  <div class="section-title">📋 Общие документы</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+
+    <!-- Согласие на обработку ПД -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:2.4rem">📝</span>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--text)">
+            Согласие на обработку персональных данных
+          </div>
+          <div style="font-size:0.78rem;color:var(--sub);margin-top:3px">
+            Обязательный документ для обучения
+          </div>
+        </div>
+      </div>
+      <p style="color:var(--sub);font-size:0.83rem;line-height:1.55">
+        Документ подтверждает ваше согласие на обработку персональных данных
+        в соответствии с ФЗ № 152 «О персональных данных».
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge badge-blue">📄 .docx</span>
+        <span class="badge badge-gray">Доступно всегда</span>
+      </div>
+      <a href="{{ url_for('download_consent') }}"
+         class="btn btn-primary"
+         style="margin-top:auto;text-align:center;justify-content:center"
+         onclick="return confirmDownload('Согласие на обработку персональных данных')">
+        ⬇ Скачать документ
+      </a>
+    </div>
+
+    <!-- Справка об обучении -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:2.4rem">🏫</span>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--text)">
+            Справка об обучении
+          </div>
+          <div style="font-size:0.78rem;color:var(--sub);margin-top:3px">
+            Сведения о всех курсах и оценках
+          </div>
+        </div>
+      </div>
+      <p style="color:var(--sub);font-size:0.83rem;line-height:1.55">
+        Официальная справка с перечнем всех курсов, статусами прохождения
+        и выставленными оценками. Выдаётся по месту требования.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge badge-blue">📄 .docx</span>
+        <span class="badge badge-green">{{ completed_courses|length }} курсов завершено</span>
+      </div>
+      <a href="{{ url_for('download_study_certificate') }}"
+         class="btn btn-success"
+         style="margin-top:auto;text-align:center;justify-content:center"
+         onclick="return confirmDownload('Справка об обучении')">
+        ⬇ Скачать справку
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<!-- Сертификаты по курсам -->
+<div class="section-title">🎓 Сертификаты о прохождении курсов</div>
+
+{% if completed_courses %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+  {% for c in completed_courses %}
+  <div style="background:var(--card);border:1px solid
+    {% if c.grade >= 90 %}rgba(74,222,128,0.3)
+    {% elif c.grade >= 75 %}rgba(79,195,247,0.3)
+    {% elif c.grade >= 60 %}rgba(251,191,36,0.3)
+    {% else %}var(--border){% endif %};
+    border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:10px">
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.95rem;color:var(--text)">
+        🏆 {{ c.title }}
+      </div>
+      {% if c.grade is not none %}
+      <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;
+        color:{% if c.grade >= 90 %}var(--green){% elif c.grade >= 75 %}var(--accent2){% elif c.grade >= 60 %}var(--yellow){% else %}var(--red){% endif %}">
+        {{ c.grade }}
+      </span>
+      {% endif %}
+    </div>
+
+    {% if c.teacher_name %}
+    <div style="font-size:0.82rem;color:var(--sub)">
+      🎓 {{ c.teacher_name }}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="badge badge-green">✓ Завершён</span>
+      {% if c.grade is not none %}
+      {% if c.grade >= 90 %}<span class="badge badge-green">Отлично</span>
+      {% elif c.grade >= 75 %}<span class="badge badge-blue">Хорошо</span>
+      {% elif c.grade >= 60 %}<span class="badge badge-yellow">Удовл.</span>
+      {% else %}<span class="badge badge-red">Неудовл.</span>{% endif %}
+      {% endif %}
+      {% if c.graded_at %}
+      <span class="badge badge-gray">{{ c.graded_at.strftime('%d.%m.%Y') }}</span>
+      {% endif %}
+    </div>
+
+    {% if c.grade is not none %}
+    <a href="{{ url_for('download_certificate', enrollment_id=c.enrollment_id) }}"
+       class="btn btn-ghost btn-sm"
+       style="text-align:center;justify-content:center;margin-top:auto"
+       onclick="return confirmDownload('Сертификат по курсу «{{ c.title|replace("'","\\'") }}»')">
+    ⬇ Скачать сертификат
+    </a>
+    {% else %}
+    <button class="btn btn-ghost btn-sm" disabled
+            style="text-align:center;justify-content:center;cursor:not-allowed;opacity:0.5">
+      ⏳ Оценка не выставлена
+    </button>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">🎓</div>
+  <p>У вас пока нет завершённых курсов.</p>
+  <p style="font-size:0.85rem;margin-top:8px">
+    Сертификаты будут доступны после успешного прохождения курсов.
+  </p>
+  <a href="{{ url_for('enroll') }}" class="btn btn-primary" style="margin-top:16px;display:inline-flex">
+    ➕ Записаться на курс
+  </a>
+</div>
+{% endif %}
+
+<div style="margin-top:32px;padding:16px 20px;background:var(--card);border:1px solid var(--border);border-radius:12px;font-size:0.82rem;color:var(--sub)">
+  ℹ️ Все документы формируются автоматически в формате <strong style="color:var(--text)">.docx</strong> (Microsoft Word).
+  Для подписания и заверения обратитесь в учебный отдел.
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function confirmDownload(name) {
+    return confirm(`Скачать документ:\n«${name}»?\n\nФайл будет сформирован в формате .docx (Word).`);
+  }
+</script>
+{% endblock %}
