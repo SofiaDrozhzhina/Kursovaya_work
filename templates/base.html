@@ -300,9 +300,11 @@
     <a href="{{ url_for('statistics') }}" class="nav-item {% if request.endpoint=='statistics' %}active{% endif %}">
       <span class="nav-icon">📈</span> Статистика
     </a>
+    {% if role == 'admin' %}
     <a href="{{ url_for('admin_documents') }}" class="nav-item {% if request.endpoint=='admin_documents' %}active{% endif %}">
       <span class="nav-icon">📁</span> Документы
     </a>
+    {% endif %}
     {% endif %}
 
     {% if role in ['student','teacher'] %}

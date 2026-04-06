@@ -19,13 +19,27 @@
         {% for r in rows %}
         <tr>
           {% if user.role == 'teacher' %}
-          <td><strong>{{ r.title }}</strong></td>
+          <td>
+            <div style="display:flex;gap:10px;align-items:center">
+              <div style="width:56px;height:40px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--bg)">
+                <img src="{{ url_for('static', filename=course_image_for(r.title)) }}" alt="img" style="width:100%;height:100%;object-fit:cover">
+              </div>
+              <strong>{{ r.title }}</strong>
+            </div>
+          </td>
           <td class="td-sub">{{ (r.description or '')[:60] }}{% if r.description and r.description|length>60 %}…{% endif %}</td>
           <td><span class="badge badge-blue">{{ r.enrolled }}</span></td>
           <td class="td-sub">{{ r.max_students }}</td>
           <td>{{ r.avg_grade if r.avg_grade else '—' }}</td>
           {% else %}
-          <td><strong>{{ r.course }}</strong></td>
+          <td>
+            <div style="display:flex;gap:10px;align-items:center">
+              <div style="width:56px;height:40px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--bg)">
+                <img src="{{ url_for('static', filename=course_image_for(r.title)) }}" alt="img" style="width:100%;height:100%;object-fit:cover">
+              </div>
+              <strong>{{ r.title }}</strong>
+            </div>
+          </td>
           <td>{{ r.teacher or '—' }}</td>
           <td>
             {% if r.status=='completed' %}<span class="badge badge-green">Завершён</span>

@@ -10,18 +10,84 @@ from functools import wraps
 import psycopg2
 import psycopg2.extras
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
 import io
 
 app = Flask(__name__)
+
+# ─── Upload helpers ──────────────────────────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Картинки курсов хранятся в проекте (static/course_images), без БД.
+COURSE_IMAGE_MAP = {
+    "основы python": "course_images/python.svg",
+    "базы данных и sql": "course_images/sql.svg",
+    "веб-разработка на flask": "course_images/flask.svg",
+    "математический анализ": "course_images/math_analysis.svg",
+    "линейная алгебра": "course_images/linear_algebra.svg",
+    "машинное обучение": "course_images/ml.svg",
+    "экономика предприятия": "course_images/economy.svg",
+    "управление проектами": "course_images/project_management.svg",
+    "дискретная математика": "course_images/discrete_math.svg",
+    "алгоритмы и структуры данных": "course_images/algorithms.svg",
+}
+
+def course_image_for(title: str | None) -> str:
+    if not title:
+        return "course_images/default.svg"
+    return COURSE_IMAGE_MAP.get(title.strip().lower(), "course_images/default.svg")
+ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+
+def _allowed_image(filename: str) -> bool:
+    ext = os.path.splitext(filename.lower())[1]
+    return ext in ALLOWED_IMAGE_EXTS
+
+def save_course_image(file_storage, old_rel_path=None):
+    """Сохраняет картинку курса в static/uploads/courses и возвращает относительный путь (для БД)."""
+    if not file_storage or not getattr(file_storage, "filename", ""):
+        return None
+    filename = secure_filename(file_storage.filename)
+    if not filename:
+        return None
+    if not _allowed_image(filename):
+        raise ValueError("Разрешены только изображения: png, jpg, jpeg, webp.")
+    # Ограничение ~5MB
+    try:
+        file_storage.stream.seek(0, os.SEEK_END)
+        size = file_storage.stream.tell()
+        file_storage.stream.seek(0)
+        if size > 5 * 1024 * 1024:
+            raise ValueError("Файл слишком большой (максимум 5MB).")
+    except Exception:
+        pass
+
+    uploads_dir = os.path.join(BASE_DIR, "static", "uploads", "courses")
+    os.makedirs(uploads_dir, exist_ok=True)
+
+    ts = datetime.now().strftime("%Y%m%d%H%M%S")
+    name, ext = os.path.splitext(filename)
+    final_name = f"{name}_{ts}{ext}"
+    abs_path = os.path.join(uploads_dir, final_name)
+    file_storage.save(abs_path)
+
+    if old_rel_path:
+        try:
+            old_abs = os.path.join(BASE_DIR, "static", old_rel_path.replace("/", os.sep))
+            if os.path.exists(old_abs):
+                os.remove(old_abs)
+        except Exception:
+            pass
+
+    return f"uploads/courses/{final_name}"
 app.secret_key = os.environ.get("SECRET_KEY", "super-secret-dev-key-change-in-prod")
 
 # ── Jinja2 helpers ────────────────────────────────────────────────────────────
 
 @app.context_processor
 def inject_globals():
-    return {"now": datetime.now()}
+    return {"now": datetime.now(), "course_image_for": course_image_for}
 
 app.jinja_env.globals["enumerate"] = enumerate
 
@@ -274,6 +340,35 @@ def add_user():
         flash(f"Пользователь «{full_name}» успешно добавлен.", "success")
     return redirect(url_for("users"))
 
+
+@app.route("/users/edit/<int:uid>", methods=["POST"])
+@login_required
+@role_required("admin")
+def edit_user(uid):
+    username  = request.form.get("username", "").strip()
+    full_name = request.form.get("full_name", "").strip()
+    email     = request.form.get("email", "").strip()
+
+    if not username or not full_name:
+        flash("Логин и имя обязательны.", "error")
+        return redirect(url_for("users"))
+    if len(username) < 3:
+        flash("Логин должен содержать минимум 3 символа.", "error")
+        return redirect(url_for("users"))
+    if email and "@" not in email:
+        flash("Введите корректный email.", "error")
+        return redirect(url_for("users"))
+
+    existing = query("SELECT id FROM users WHERE username=%s AND id<>%s", (username, uid), fetchone=True)
+    if existing:
+        flash(f"Логин «{username}» уже занят.", "error")
+        return redirect(url_for("users"))
+
+    query("UPDATE users SET username=%s, full_name=%s, email=%s WHERE id=%s",
+          (username, full_name, email or None, uid), commit=True)
+    flash("Пользователь обновлён.", "success")
+    return redirect(url_for("users"))
+
 # ─── Students ───────────────────────────────────────────────────────────────
 
 @app.route("/students")
@@ -366,8 +461,23 @@ def teachers():
 @login_required
 @role_required("admin")
 def edit_teacher(tid):
+    full_name  = request.form.get("full_name", "").strip()
+    email      = request.form.get("email", "").strip()
+    department = request.form.get("department", "").strip()
+    degree     = request.form.get("degree", "").strip()
+
+    if not full_name:
+        flash("ФИО преподавателя не может быть пустым.", "error")
+        return redirect(url_for("teachers"))
+    if email and "@" not in email:
+        flash("Введите корректный email.", "error")
+        return redirect(url_for("teachers"))
+
     query("UPDATE teachers SET department=%s, degree=%s WHERE id=%s",
-          (request.form.get("department"), request.form.get("degree"), tid), commit=True)
+          (department or None, degree or None, tid), commit=True)
+    query("UPDATE users SET full_name=%s, email=%s WHERE id=(SELECT user_id FROM teachers WHERE id=%s)",
+          (full_name, email or None, tid), commit=True)
+
     flash("Данные преподавателя обновлены.", "success")
     return redirect(url_for("teachers"))
 
@@ -395,7 +505,7 @@ def courses():
     rows = query("""
         SELECT co.id, co.title, co.description, u.full_name AS teacher_name,
                co.max_students,
-               COUNT(DISTINCT e.id) AS enrolled,
+               COUNT(DISTINCT CASE WHEN e.status<>'dropped' THEN e.id END) AS enrolled,
                COUNT(DISTINCT CASE WHEN e.status='completed' THEN e.id END) AS completed,
                ROUND(AVG(g.grade)::numeric,1) AS avg_grade,
                co.created_at
@@ -423,6 +533,7 @@ def add_course():
     if len(title) < 3:
         flash("Название курса должно содержать минимум 3 символа.", "error")
         return redirect(url_for("courses"))
+
     max_s_raw = request.form.get("max_students", "30")
     try:
         max_s = int(max_s_raw)
@@ -448,15 +559,31 @@ def add_course():
 @login_required
 @role_required("admin")
 def edit_course(cid):
-    query("""
-        UPDATE courses SET title=%s, description=%s, teacher_id=%s, max_students=%s WHERE id=%s
-    """, (
-        request.form.get("title"),
-        request.form.get("description"),
-        request.form.get("teacher_id") or None,
-        request.form.get("max_students") or 30,
-        cid
-    ), commit=True)
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Название курса обязательно.", "error")
+        return redirect(url_for("courses"))
+
+    max_s_raw = request.form.get("max_students", "30")
+    try:
+        max_s = int(max_s_raw)
+        if max_s < 1 or max_s > 500:
+            raise ValueError
+    except ValueError:
+        flash("Максимальное количество студентов должно быть числом от 1 до 500.", "error")
+        return redirect(url_for("courses"))
+
+    query(
+        "UPDATE courses SET title=%s, description=%s, teacher_id=%s, max_students=%s WHERE id=%s",
+        (
+            title,
+            request.form.get("description", "").strip() or None,
+            request.form.get("teacher_id") or None,
+            max_s,
+            cid,
+        ),
+        commit=True,
+    )
     flash("Курс обновлён.", "success")
     return redirect(url_for("courses"))
 
@@ -522,6 +649,31 @@ def set_grade():
         flash("Оценка должна быть числом от 0 до 100.", "error")
         return redirect(url_for("grades"))
 
+    enrollment = query("SELECT id, course_id FROM enrollments WHERE id=%s", (eid,), fetchone=True)
+    if not enrollment:
+        flash("Запись на курс не найдена.", "error")
+        return redirect(url_for("grades"))
+
+    user = current_user()
+    if user["role"] == "teacher":
+        tid = query("SELECT id FROM teachers WHERE user_id=%s", (user["id"],), fetchone=True)
+        tid = tid["id"] if tid else -1
+        allowed = query("SELECT id FROM courses WHERE id=%s AND teacher_id=%s",
+                        (enrollment["course_id"], tid), fetchone=True)
+        if not allowed:
+            flash("Нельзя выставлять оценку по чужому курсу.", "error")
+            return redirect(url_for("grades"))
+
+    query("""
+        INSERT INTO grades (enrollment_id, grade, comment, graded_at)
+        VALUES (%s,%s,%s,NOW())
+        ON CONFLICT (enrollment_id) DO UPDATE
+        SET grade=EXCLUDED.grade, comment=EXCLUDED.comment, graded_at=NOW()
+    """, (eid, grade, comment), commit=True)
+    query("UPDATE enrollments SET status='completed' WHERE id=%s", (eid,), commit=True)
+    flash(f"Оценка {grade} успешно сохранена.", "success")
+    return redirect(url_for("grades"))
+
     # Проверяем что запись существует
     enrollment = query("SELECT id FROM enrollments WHERE id=%s", (eid,), fetchone=True)
     if not enrollment:
@@ -536,6 +688,22 @@ def set_grade():
     """, (eid, grade, comment), commit=True)
     query("UPDATE enrollments SET status='completed' WHERE id=%s", (eid,), commit=True)
     flash(f"Оценка {grade} успешно сохранена.", "success")
+    return redirect(url_for("grades"))
+
+
+@app.route("/grades/delete/<int:eid>", methods=["POST"])
+@login_required
+@role_required("admin")
+def delete_grade(eid):
+    g = query("SELECT id FROM grades WHERE enrollment_id=%s", (eid,), fetchone=True)
+    if not g:
+        flash("Оценка не найдена.", "error")
+        return redirect(url_for("grades"))
+
+    query("DELETE FROM grades WHERE enrollment_id=%s", (eid,), commit=True)
+    query("UPDATE enrollments SET status='active' WHERE id=%s", (eid,), commit=True)
+
+    flash("Оценка удалена.", "success")
     return redirect(url_for("grades"))
 
 # ─── Statistics ──────────────────────────────────────────────────────────────
@@ -622,16 +790,16 @@ def my_courses():
         if tid:
             rows = query("""
                 SELECT co.id, co.title, co.description, co.max_students,
-                       COUNT(DISTINCT e.id) AS enrolled,
+                       COUNT(DISTINCT CASE WHEN e.status<>'dropped' THEN e.id END) AS enrolled,
                        ROUND(AVG(g.grade)::numeric,1) AS avg_grade
                 FROM courses co
                 LEFT JOIN enrollments e ON e.course_id=co.id
                 LEFT JOIN grades g ON g.enrollment_id=e.id
-                WHERE co.teacher_id=%s GROUP BY co.id ORDER BY co.title
+                WHERE co.teacher_id=%s GROUP BY co.id, co.title, co.description, co.max_students ORDER BY co.title
             """, (tid["id"],), fetchall=True)
     else:
         rows = query("""
-            SELECT co.id, co.title, u.full_name AS teacher, e.status, g.grade, e.enrolled_at
+            SELECT co.id, co.title AS title, u.full_name AS teacher, e.status, g.grade, e.enrolled_at
             FROM enrollments e
             JOIN courses co ON e.course_id=co.id
             LEFT JOIN teachers t ON co.teacher_id=t.id
@@ -671,7 +839,7 @@ def enroll():
 
         # Проверка: не превышен ли лимит мест
         enrolled_count = query(
-            "SELECT COUNT(*) AS n FROM enrollments WHERE course_id=%s", (cid,), fetchone=True
+            "SELECT COUNT(*) AS n FROM enrollments WHERE course_id=%s AND status<>\'dropped\'", (cid,), fetchone=True
         )["n"]
         if enrolled_count >= course["max_students"]:
             flash(f"К сожалению, курс «{course['title']}» уже набрал максимальное количество участников ({course['max_students']}).", "error")
@@ -686,7 +854,8 @@ def enroll():
         "SELECT course_id FROM enrollments WHERE student_id=%s", (sid,), fetchall=True)}
     courses_list = query("""
         SELECT co.id, co.title, co.description, u.full_name AS teacher,
-               COUNT(DISTINCT e.id) AS enrolled, co.max_students
+               COUNT(DISTINCT CASE WHEN e.status<>'dropped' THEN e.id END) AS enrolled,
+               co.max_students
         FROM courses co
         LEFT JOIN teachers t ON co.teacher_id=t.id
         LEFT JOIN users u ON t.user_id=u.id
@@ -754,7 +923,7 @@ def download_gradebook_excel():
     """Журнал успеваемости в формате Excel"""
     try:
         from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
     except ImportError:
         flash("Установите openpyxl: pip install openpyxl", "error")
@@ -763,7 +932,22 @@ def download_gradebook_excel():
     user = current_user()
     now  = datetime.now()
 
-    # Получаем данные в зависимости от роли
+    status_map = {"completed": "Завершён", "active": "Активен", "dropped": "Отчислен"}
+
+    is_admin = user["role"] == "admin"
+    if is_admin:
+        headers = ["№", "ФИО студента", "Группа", "Курс", "Преподаватель",
+                   "Дата записи", "Статус", "Оценка", "Комментарий", "Дата оценки"]
+        col_widths = [5, 30, 12, 35, 28, 14, 14, 10, 35, 14]
+    else:
+        headers = ["№", "ФИО студента", "Группа", "Курс",
+                   "Дата записи", "Статус", "Оценка", "Комментарий", "Дата оценки"]
+        col_widths = [5, 30, 12, 35, 14, 14, 10, 35, 14]
+
+    max_cols = len(headers)
+    last_col_letter = get_column_letter(max_cols)
+
+    # Получаем данные
     if user["role"] == "teacher":
         tid = query("SELECT id FROM teachers WHERE user_id=%s", (user["id"],), fetchone=True)
         if not tid:
@@ -804,10 +988,10 @@ def download_gradebook_excel():
     ws.title = "Журнал успеваемости"
 
     # Стили
-    PURPLE     = "4B3F8C"
+    PURPLE       = "4B3F8C"
     PURPLE_LIGHT = "E8E4F8"
-    GRAY_LIGHT = "F5F5F5"
-    WHITE      = "FFFFFF"
+    GRAY_LIGHT   = "F5F5F5"
+    WHITE        = "FFFFFF"
 
     hdr_font  = Font(name="Arial", bold=True, color=WHITE, size=11)
     hdr_fill  = PatternFill("solid", fgColor=PURPLE)
@@ -817,40 +1001,29 @@ def download_gradebook_excel():
     sub_fill  = PatternFill("solid", fgColor=PURPLE_LIGHT)
     sub_align = Alignment(horizontal="center", vertical="center")
 
-    body_font  = Font(name="Arial", size=10)
-    body_align = Alignment(vertical="center", wrap_text=True)
+    body_font    = Font(name="Arial", size=10)
+    body_align   = Alignment(vertical="center", wrap_text=True)
     center_align = Alignment(horizontal="center", vertical="center")
 
     thin = Side(style="thin", color="CCCCCC")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     # ── Заголовок документа ──────────────────────────────────
-    ws.merge_cells("A1:H1")
+    ws.merge_cells(f"A1:{last_col_letter}1")
     ws["A1"] = "ЖУРНАЛ УСПЕВАЕМОСТИ СТУДЕНТОВ"
     ws["A1"].font  = Font(name="Arial", bold=True, size=14, color=PURPLE)
     ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 30
 
-    ws.merge_cells("A2:H2")
+    ws.merge_cells(f"A2:{last_col_letter}2")
     ws["A2"] = f"Сформирован: {now.strftime('%d.%m.%Y %H:%M')}  |  {teacher_name}"
     ws["A2"].font      = Font(name="Arial", italic=True, size=10, color="666666")
     ws["A2"].alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[2].height = 18
 
-    ws.append([])  # пустая строка
+    ws.append([])
 
-    # ── Заголовки столбцов ───────────────────────────────────
-    status_map = {"completed": "Завершён", "active": "Активен", "dropped": "Отчислен"}
-
-    if user["role"] == "admin":
-        headers = ["№", "ФИО студента", "Группа", "Курс", "Преподаватель",
-                   "Дата записи", "Статус", "Оценка", "Комментарий", "Дата оценки"]
-        col_widths = [5, 30, 12, 35, 28, 14, 14, 10, 35, 14]
-    else:
-        headers = ["№", "ФИО студента", "Группа", "Курс",
-                   "Дата записи", "Статус", "Оценка", "Комментарий", "Дата оценки"]
-        col_widths = [5, 30, 12, 35, 14, 14, 10, 35, 14]
-
+    # ── Заголовки ────────────────────────────────────────────
     ws.append(headers)
     hdr_row = ws.max_row
     ws.row_dimensions[hdr_row].height = 36
@@ -865,26 +1038,24 @@ def download_gradebook_excel():
     # ── Данные ───────────────────────────────────────────────
     prev_course = None
     for idx, r in enumerate(rows, 1):
-        # Разделитель по курсу
         course = r["course_title"]
         if course != prev_course:
             ws.append([])
             sep_row = ws.max_row
-            last_col = len(headers)
-            ws.merge_cells(start_row=sep_row, start_column=1,
-                           end_row=sep_row,   end_column=last_col)
+            ws.merge_cells(start_row=sep_row, start_column=1, end_row=sep_row, end_column=max_cols)
             c = ws.cell(row=sep_row, column=1)
             c.value     = f"  📖 {course}"
             c.font      = sub_font
             c.fill      = sub_fill
             c.alignment = sub_align
+            c.border    = border
             ws.row_dimensions[sep_row].height = 22
             prev_course = course
 
-        grade = r["grade"]
+        grade = r.get("grade")
         grade_val = float(grade) if grade is not None else None
 
-        if user["role"] == "admin":
+        if is_admin:
             data_row = [
                 idx,
                 r["student_name"],
@@ -894,9 +1065,11 @@ def download_gradebook_excel():
                 r["enrolled_at"].strftime("%d.%m.%Y") if r["enrolled_at"] else "",
                 status_map.get(r["status"], r["status"]),
                 grade_val,
-                r["comment"] or "",
-                r["graded_at"].strftime("%d.%m.%Y") if r["graded_at"] else "",
-                ]
+                r.get("comment") or "",
+                r["graded_at"].strftime("%d.%m.%Y") if r.get("graded_at") else "",
+            ]
+            grade_col = 8
+            center_cols = {1, 6, 7, 8, 10}
         else:
             data_row = [
                 idx,
@@ -906,26 +1079,23 @@ def download_gradebook_excel():
                 r["enrolled_at"].strftime("%d.%m.%Y") if r["enrolled_at"] else "",
                 status_map.get(r["status"], r["status"]),
                 grade_val,
-                r["comment"] or "",
-                r["graded_at"].strftime("%d.%m.%Y") if r["graded_at"] else "",
-                ]
+                r.get("comment") or "",
+                r["graded_at"].strftime("%d.%m.%Y") if r.get("graded_at") else "",
+            ]
+            grade_col = 7
+            center_cols = {1, 5, 6, 7, 9}
 
         ws.append(data_row)
-        data_row_idx = ws.max_row
-        ws.row_dimensions[data_row_idx].height = 20
+        row_i = ws.max_row
+        ws.row_dimensions[row_i].height = 20
 
         for col_i, val in enumerate(data_row, 1):
-            cell = ws.cell(row=data_row_idx, column=col_i)
+            cell = ws.cell(row=row_i, column=col_i)
             cell.font   = body_font
             cell.border = border
             cell.fill   = PatternFill("solid", fgColor=WHITE if idx % 2 == 0 else GRAY_LIGHT)
-            # Числа по центру
-            if col_i in (1, 7, 8) if user["role"] != "admin" else col_i in (1, 8, 9):
-                cell.alignment = center_align
-            else:
-                cell.alignment = body_align
-            # Цвет оценки
-            grade_col = 8 if user["role"] == "admin" else 7
+            cell.alignment = center_align if col_i in center_cols else body_align
+
             if col_i == grade_col and grade_val is not None:
                 if grade_val >= 90:
                     cell.font = Font(name="Arial", size=10, bold=True, color="166534")
@@ -936,12 +1106,12 @@ def download_gradebook_excel():
                 else:
                     cell.font = Font(name="Arial", size=10, bold=True, color="DC2626")
 
-    # ── Итоговая строка ──────────────────────────────────────
+    # ── Итоги ────────────────────────────────────────────────
     ws.append([])
-    grades_only = [float(r["grade"]) for r in rows if r["grade"] is not None]
-    total_row = ws.max_row + 1
+    grades_only = [float(r["grade"]) for r in rows if r.get("grade") is not None]
     ws.append([
-        "ИТОГО:", f"Записей: {len(rows)}",
+        "ИТОГО:",
+        f"Записей: {len(rows)}",
         f"С оценкой: {len(grades_only)}",
         f"Средний балл: {round(sum(grades_only)/len(grades_only),1) if grades_only else '—'}",
         f"Отлично (90-100): {sum(1 for g in grades_only if g>=90)}",
@@ -949,15 +1119,18 @@ def download_gradebook_excel():
         f"Удовл. (60-74): {sum(1 for g in grades_only if 60<=g<75)}",
         f"Неудовл. (<60): {sum(1 for g in grades_only if g<60)}",
     ])
-    for col in range(1, 9):
-        c = ws.cell(row=ws.max_row, column=col)
+    while ws.max_column < max_cols:
+        ws.cell(row=ws.max_row, column=ws.max_column + 1, value="")
+
+    total_r = ws.max_row
+    ws.row_dimensions[total_r].height = 24
+    for col in range(1, max_cols + 1):
+        c = ws.cell(row=total_r, column=col)
         c.font  = Font(name="Arial", bold=True, size=10, color=PURPLE)
         c.fill  = PatternFill("solid", fgColor=PURPLE_LIGHT)
-        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         c.border = border
-    ws.row_dimensions[ws.max_row].height = 22
 
-    # Freeze header
     ws.freeze_panes = f"A{hdr_row + 1}"
 
     buf = io.BytesIO()
@@ -1112,49 +1285,142 @@ def download_certificate(enrollment_id):
 
 def _generate_certificate_pdf(student_name, course_title, teacher_name,
                               grade, graded_at=None):
-    """Генерация красивого PDF сертификата через reportlab"""
+    """Генерация PDF сертификата через reportlab (кириллица + аккуратные звёзды + подпись директора)."""
+    from math import cos, sin, pi
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
     from reportlab.lib.units import cm, mm
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table,
+        TableStyle, Image, Flowable
+    )
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfbase.pdfmetrics import registerFontFamily
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+
+    class StarRating(Flowable):
+        def __init__(self, filled, total=5, size=8*mm, gap=2.2*mm,
+                     fill_color=colors.HexColor("#C9A84C"),
+                     empty_color=colors.HexColor("#E6D9A7")):
+            super().__init__()
+            self.filled = max(0, min(int(filled), int(total)))
+            self.total = int(total)
+            self.size = float(size)
+            self.gap = float(gap)
+            self.fill_color = fill_color
+            self.empty_color = empty_color
+            self.width = self.total * self.size + (self.total - 1) * self.gap
+            self.height = self.size
+            self.hAlign = "CENTER"
+
+        def _star_points(self, cx, cy, outer_r, inner_r):
+            pts = []
+            angle = -pi / 2
+            step = pi / 5
+            for i in range(10):
+                r = outer_r if i % 2 == 0 else inner_r
+                x = cx + cos(angle) * r
+                y = cy + sin(angle) * r
+                pts.extend([x, y])
+                angle += step
+            return pts
+
+        def draw(self):
+            c = self.canv
+            outer = self.size / 2
+            inner = outer * 0.48
+            baseline_y = self.size / 2
+
+            for i in range(self.total):
+                cx = outer + i * (self.size + self.gap)
+                pts = self._star_points(cx, baseline_y, outer, inner)
+
+                path = c.beginPath()
+                path.moveTo(pts[0], pts[1])
+                for j in range(2, len(pts), 2):
+                    path.lineTo(pts[j], pts[j + 1])
+                path.close()
+
+                if i < self.filled:
+                    c.setFillColor(self.fill_color)
+                    c.setStrokeColor(self.fill_color)
+                    c.drawPath(path, fill=1, stroke=1)
+                else:
+                    c.setFillColor(colors.white)
+                    c.setStrokeColor(self.empty_color)
+                    c.setLineWidth(1)
+                    c.drawPath(path, fill=1, stroke=1)
 
     buf = io.BytesIO()
     page_w, page_h = landscape(A4)
 
-    # Цвета
-    PURPLE      = colors.HexColor("#4B3F8C")
-    PURPLE_LIGHT= colors.HexColor("#7B6DC5")
-    GOLD        = colors.HexColor("#C9A84C")
-    GREEN       = colors.HexColor("#16A34A")
-    BLUE        = colors.HexColor("#0284C7")
-    ORANGE      = colors.HexColor("#D97706")
-    RED_C       = colors.HexColor("#DC2626")
-    GRAY        = colors.HexColor("#64748B")
-    LIGHT_BG    = colors.HexColor("#F5F3FF")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    fonts_dir = os.path.join(base_dir, "fonts")
 
-    # Определяем уровень
+    def pick_font(*names):
+        candidates = []
+        for name in names:
+            candidates.append(os.path.join(fonts_dir, name))
+            win_dir = os.environ.get("WINDIR")
+            if win_dir:
+                candidates.append(os.path.join(win_dir, "Fonts", name))
+        for path in candidates:
+            if path and os.path.exists(path):
+                return path
+        return None
+
+    regular = pick_font("DejaVuSans.ttf") or pick_font("arial.ttf")
+    bold = pick_font("DejaVuSans-Bold.ttf") or pick_font("arialbd.ttf") or regular
+    italic = pick_font("DejaVuSans-Oblique.ttf") or pick_font("ariali.ttf") or regular
+    bold_italic = pick_font("DejaVuSans-BoldOblique.ttf") or pick_font("arialbi.ttf") or bold
+
+    if not regular:
+        raise FileNotFoundError(
+            "Не найден шрифт для PDF. Положите DejaVuSans.ttf в папку fonts/ "
+            "или убедитесь, что на компьютере доступен Arial (C:\\Windows\\Fonts)."
+        )
+
+    pdfmetrics.registerFont(TTFont("AppSans", regular))
+    pdfmetrics.registerFont(TTFont("AppSans-Bold", bold))
+    pdfmetrics.registerFont(TTFont("AppSans-Italic", italic))
+    pdfmetrics.registerFont(TTFont("AppSans-BoldItalic", bold_italic))
+    registerFontFamily(
+        "AppSans",
+        normal="AppSans",
+        bold="AppSans-Bold",
+        italic="AppSans-Italic",
+        boldItalic="AppSans-BoldItalic",
+    )
+
+    PURPLE       = colors.HexColor("#4B3F8C")
+    PURPLE_LIGHT = colors.HexColor("#7B6DC5")
+    GOLD         = colors.HexColor("#C9A84C")
+    GOLD_LIGHT   = colors.HexColor("#E6D9A7")
+    GREEN        = colors.HexColor("#16A34A")
+    BLUE         = colors.HexColor("#0284C7")
+    ORANGE       = colors.HexColor("#D97706")
+    GRAY         = colors.HexColor("#64748B")
+    LIGHT_BG     = colors.HexColor("#F5F3FF")
+
     if grade >= 90:
-        level_text  = "с отличием"
+        level_text = "с отличием"
         level_color = GREEN
-        stars = "★★★★★"
+        stars = 5
     elif grade >= 75:
-        level_text  = "с хорошим результатом"
+        level_text = "с хорошим результатом"
         level_color = BLUE
-        stars = "★★★★☆"
+        stars = 4
     elif grade >= 60:
-        level_text  = "с удовлетворительным результатом"
+        level_text = "с удовлетворительным результатом"
         level_color = ORANGE
-        stars = "★★★☆☆"
+        stars = 3
     else:
-        level_text  = ""
+        level_text = ""
         level_color = GRAY
-        stars = "★★☆☆☆"
+        stars = 2
 
-    # Дата
     months_ru = {1:'января',2:'февраля',3:'марта',4:'апреля',5:'мая',6:'июня',
                  7:'июля',8:'августа',9:'сентября',10:'октября',11:'ноября',12:'декабря'}
     if graded_at:
@@ -1163,47 +1429,39 @@ def _generate_certificate_pdf(student_name, course_title, teacher_name,
         n = datetime.now()
         date_str = f"{n.day} {months_ru[n.month]} {n.year} г."
 
-    # Стили
     def s(name, **kw):
         return ParagraphStyle(name, **kw)
 
-    sOrg     = s("org",     fontName="Helvetica-Bold",   fontSize=11, textColor=PURPLE,       alignment=TA_CENTER, spaceAfter=2)
-    sTitle   = s("title",   fontName="Helvetica-Bold",   fontSize=36, textColor=PURPLE,       alignment=TA_CENTER, spaceAfter=4, leading=42)
-    sSub     = s("sub",     fontName="Helvetica-Oblique",fontSize=14, textColor=PURPLE_LIGHT, alignment=TA_CENTER, spaceAfter=16)
-    sLabel   = s("label",   fontName="Helvetica",        fontSize=12, textColor=GRAY,         alignment=TA_CENTER, spaceAfter=4)
-    sName    = s("name",    fontName="Helvetica-Bold",   fontSize=28, textColor=colors.black, alignment=TA_CENTER, spaceAfter=4, leading=34)
-    sCourse  = s("course",  fontName="Helvetica-Bold",   fontSize=20, textColor=PURPLE,       alignment=TA_CENTER, spaceAfter=8, leading=26)
-    sLevel   = s("level",   fontName="Helvetica-Oblique",fontSize=14, textColor=level_color,  alignment=TA_CENTER, spaceAfter=4)
-    sGrade   = s("grade",   fontName="Helvetica-Bold",   fontSize=18, textColor=level_color,  alignment=TA_CENTER, spaceAfter=4)
-    sStars   = s("stars",   fontName="Helvetica",        fontSize=20, textColor=GOLD,         alignment=TA_CENTER, spaceAfter=16)
-    sSmall   = s("small",   fontName="Helvetica",        fontSize=10, textColor=GRAY,         alignment=TA_CENTER, spaceAfter=2)
-    sSigL    = s("sigl",    fontName="Helvetica",        fontSize=10, textColor=colors.black, alignment=TA_LEFT)
-    sSigR    = s("sigr",    fontName="Helvetica",        fontSize=10, textColor=colors.black, alignment=TA_RIGHT)
+    sOrg    = s("org",    fontName="AppSans-Bold",   fontSize=11, textColor=PURPLE,       alignment=TA_CENTER, spaceAfter=2)
+    sTitle  = s("title",  fontName="AppSans-Bold",   fontSize=36, textColor=PURPLE,       alignment=TA_CENTER, spaceAfter=4, leading=42)
+    sSub    = s("sub",    fontName="AppSans-Italic", fontSize=14, textColor=PURPLE_LIGHT, alignment=TA_CENTER, spaceAfter=16)
+    sLabel  = s("label",  fontName="AppSans",        fontSize=12, textColor=GRAY,         alignment=TA_CENTER, spaceAfter=4)
+    sName   = s("name",   fontName="AppSans-Bold",   fontSize=28, textColor=colors.black, alignment=TA_CENTER, spaceAfter=4, leading=34)
+    sCourse = s("course", fontName="AppSans-Bold",   fontSize=20, textColor=PURPLE,       alignment=TA_CENTER, spaceAfter=8, leading=26)
+    sLevel  = s("level",  fontName="AppSans-Italic", fontSize=14, textColor=level_color,  alignment=TA_CENTER, spaceAfter=2)
+    sGrade  = s("grade",  fontName="AppSans-Bold",   fontSize=18, textColor=level_color,  alignment=TA_CENTER, spaceAfter=3)
+    sSigL   = s("sigl",   fontName="AppSans",        fontSize=10, textColor=colors.black, alignment=TA_LEFT, leading=12)
+    sSigR   = s("sigr",   fontName="AppSans",        fontSize=10, textColor=colors.black, alignment=TA_RIGHT, leading=12)
+    sMp     = s("mp",     fontName="AppSans-Bold",   fontSize=14, textColor=PURPLE,       alignment=TA_CENTER)
 
     margin = 2*cm
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4),
                             leftMargin=margin, rightMargin=margin,
                             topMargin=1.5*cm, bottomMargin=1.5*cm)
-
     content_w = page_w - 2*margin
 
     def draw_border(canvas_obj, doc_obj):
-        """Декоративная рамка"""
         c2 = canvas_obj
         w, h = landscape(A4)
-        # Внешняя рамка
         c2.setStrokeColor(PURPLE)
         c2.setLineWidth(4)
         c2.rect(1*cm, 1*cm, w - 2*cm, h - 2*cm)
-        # Внутренняя рамка
         c2.setStrokeColor(GOLD)
         c2.setLineWidth(1.5)
         c2.rect(1.3*cm, 1.3*cm, w - 2.6*cm, h - 2.6*cm)
-        # Уголки
         c2.setFillColor(PURPLE)
         for cx, cy in [(1*cm, 1*cm),(w-1*cm,1*cm),(1*cm,h-1*cm),(w-1*cm,h-1*cm)]:
             c2.circle(cx, cy, 3*mm, fill=1, stroke=0)
-        # Фоновый оттенок
         c2.setFillColor(LIGHT_BG)
         c2.setFillAlpha(0.4)
         c2.rect(1.3*cm, 1.3*cm, w-2.6*cm, h-2.6*cm, fill=1, stroke=0)
@@ -1225,29 +1483,61 @@ def _generate_certificate_pdf(student_name, course_title, teacher_name,
     if level_text:
         story.append(Paragraph(level_text, sLevel))
     story.append(Paragraph(f"Итоговая оценка: {grade} баллов", sGrade))
-    story.append(Paragraph(stars, sStars))
+    story.append(Spacer(1, 1.5*mm))
+    story.append(StarRating(stars, total=5, size=7.5*mm, gap=2.5*mm, fill_color=GOLD, empty_color=GOLD_LIGHT))
+    story.append(Spacer(1, 8*mm))
 
-    story.append(HRFlowable(width="80%", thickness=1, color=GOLD, spaceBefore=4, spaceAfter=10))
+    story.append(HRFlowable(width="80%", thickness=1, color=GOLD, spaceBefore=0, spaceAfter=10))
 
-    # Подписи
+    director_name = os.environ.get("DIRECTOR_NAME", "Иванов И.И.")
+    sig_rel = os.environ.get("DIRECTOR_SIGNATURE", "static/signatures/director.png")
+    sig_abs = os.path.join(base_dir, sig_rel.replace("/", os.sep))
+
+    sign_block = []
+    if os.path.exists(sig_abs):
+        try:
+            sig_img = Image(sig_abs, width=4.5*cm, height=1.9*cm)
+            sign_block.append(sig_img)
+            sign_block.append(Spacer(1, 1.2*mm))
+        except Exception:
+            pass
+
+    sign_block.append(Paragraph("________________", sSigR))
+
+    right_inner = Table([
+        [Paragraph(f"Ректор:<br/><b>{director_name}</b>", sSigR)],
+        [Spacer(1, 1.5*mm)],
+        [sign_block],
+    ], colWidths=[content_w*0.35])
+    right_inner.setStyle(TableStyle([
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("ALIGN", (0,0), (-1,-1), "RIGHT"),
+        ("LEFTPADDING",  (0,0), (-1,-1), 0),
+        ("RIGHTPADDING", (0,0), (-1,-1), 0),
+        ("TOPPADDING",   (0,0), (-1,-1), 0),
+        ("BOTTOMPADDING",(0,0), (-1,-1), 0),
+    ]))
+
     sig_data = [[
-        Paragraph(f"Дата выдачи:\n<b>{date_str}</b>", sSigL),
-        Paragraph("М.П.", s("mp", fontName="Helvetica", fontSize=14,
-                            textColor=PURPLE, alignment=TA_CENTER)),
-        Paragraph(f"Преподаватель:\n<b>{teacher_name}</b>\n\n_______________" if teacher_name
-                  else "Ректор:\n\n_______________", sSigR),
+        Paragraph(f"Дата выдачи:<br/><b>{date_str}</b>", sSigL),
+        Paragraph("М.П.", sMp),
+        right_inner,
     ]]
     sig_table = Table(sig_data, colWidths=[content_w*0.35, content_w*0.3, content_w*0.35])
     sig_table.setStyle(TableStyle([
-        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("VALIGN", (0,0), (-1,-1), "BOTTOM"),
         ("LEFTPADDING",  (0,0), (-1,-1), 0),
         ("RIGHTPADDING", (0,0), (-1,-1), 0),
+        ("TOPPADDING",   (0,0), (-1,-1), 0),
+        ("BOTTOMPADDING",(0,0), (-1,-1), 0),
     ]))
     story.append(sig_table)
 
     doc.build(story, onFirstPage=draw_border, onLaterPages=draw_border)
     buf.seek(0)
     return buf.read()
+
+
 
 
 # ─── Документы для администратора ────────────────────────────────────────────

@@ -37,7 +37,7 @@
       <a href="{{ url_for('download_consent') }}"
          class="btn btn-primary"
          style="margin-top:auto;text-align:center;justify-content:center"
-         onclick="return confirmDownload('Согласие на обработку персональных данных')">
+         onclick="return confirmDownload('Согласие на обработку персональных данных', 'docx')">
         ⬇ Скачать документ
       </a>
     </div>
@@ -66,7 +66,7 @@
       <a href="{{ url_for('download_study_certificate') }}"
          class="btn btn-success"
          style="margin-top:auto;text-align:center;justify-content:center"
-         onclick="return confirmDownload('Справка об обучении')">
+         onclick="return confirmDownload('Справка об обучении', 'docx')">
         ⬇ Скачать справку
       </a>
     </div>
@@ -122,7 +122,7 @@
     <a href="{{ url_for('download_certificate', enrollment_id=c.enrollment_id) }}"
        class="btn btn-ghost btn-sm"
        style="text-align:center;justify-content:center;margin-top:auto"
-       onclick="return confirmDownload('Сертификат по курсу «{{ c.title|replace("'","\\'") }}»')">
+       onclick="return confirmDownload('Сертификат по курсу «{{ c.title|replace("'","\\'") }}»', 'pdf')">
     ⬇ Скачать сертификат
     </a>
     {% else %}
@@ -149,8 +149,7 @@
 {% endif %}
 
 <div style="margin-top:32px;padding:16px 20px;background:var(--card);border:1px solid var(--border);border-radius:12px;font-size:0.82rem;color:var(--sub)">
-  ℹ️ Все документы формируются автоматически в формате <strong style="color:var(--text)">.docx</strong> (Microsoft Word).
-  Для подписания и заверения обратитесь в учебный отдел.
+  ℹ️ Документы формируются автоматически: <strong style="color:var(--text)">согласие</strong> и <strong style="color:var(--text)">справка</strong> — в формате <strong style="color:var(--text)">.docx</strong>, а <strong style="color:var(--text)">сертификат</strong> — в формате <strong style="color:var(--text)">.pdf</strong>.
 </div>
 {% endblock %}
 

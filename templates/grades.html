@@ -51,18 +51,29 @@
         <td class="td-sub" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
           {{ r.comment or '' }}
         </td>
-        <td>
-          <button class="btn btn-ghost btn-sm"
-                  onclick="openGradeModal(
-                {{ r.id }},
-                '{{ r.student|replace("'","\\'") }}',
-          '{{ r.course|replace("'","\\'") }}',
-          {{ r.grade if r.grade is not none else 'null' }},
-          '{{ (r.comment or '')|replace("'","\\'")|replace('"','\\"') }}'
-          )">
-          {% if r.grade is not none %}✎ Изменить{% else %}✚ Выставить{% endif %}
-          </button>
+        
+        <td style="white-space:nowrap">
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm"
+                    onclick="openGradeModal(
+                  {{ r.id }},
+                  '{{ r.student|replace("'","\\'") }}',
+            '{{ r.course|replace("'","\\'") }}',
+            {{ r.grade if r.grade is not none else 'null' }},
+            '{{ (r.comment or '')|replace("'","\\'")|replace('"','\\"') }}'
+            )">
+            {% if r.grade is not none %}✎ Изменить{% else %}✚ Выставить{% endif %}
+            </button>
+
+            {% if user.role == 'admin' and r.grade is not none %}
+            <button class="btn btn-danger btn-sm" title="Удалить оценку"
+                    onclick="confirmDeleteGrade({{ r.id }}, '{{ r.student|replace("'","\\'") }}', '{{ r.course|replace("'","\\'") }}')">
+              🗑
+            </button>
+            {% endif %}
+          </div>
         </td>
+
       </tr>
       {% else %}
       <tr>
@@ -73,6 +84,8 @@
     </table>
   </div>
 </div>
+
+<form id="deleteGradeForm" method="post" action="" style="display:none"></form>
 
 <!-- Модальное окно оценки -->
 <div class="modal-overlay" id="gradeModal">

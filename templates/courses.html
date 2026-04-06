@@ -16,8 +16,16 @@
         {% for r in rows %}
         <tr>
           <td>
-            <strong>{{ r.title }}</strong>
+            <div style="display:flex;gap:12px;align-items:center">
+              <div style="width:56px;height:40px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--bg)">
+                <img src="{{ url_for('static', filename=course_image_for(r.title)) }}" alt="img" style="width:100%;height:100%;object-fit:cover">
+              </div>
+              <div>
+                <strong>{{ r.title }}</strong>
+            </div>
             {% if r.description %}<br><span class="td-sub" style="max-width:280px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.description }}</span>{% endif %}
+              </div>
+            </div>
           </td>
           <td>{{ r.teacher_name or '—' }}</td>
           <td>
@@ -67,6 +75,7 @@
           {% for t in teacher_list %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}
         </select>
       </div>
+      <div class="form-group"><label>Картинка курса</label><div class="td-sub">Берётся из папки <code>static/course_images</code> по названию курса.</div></div>
       <div class="form-group"><label>Макс. студентов</label><input type="number" name="max_students" value="30" min="1"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="closeModal('addModal')">Отмена</button>
@@ -90,6 +99,7 @@
           {% for t in teacher_list %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}
         </select>
       </div>
+      <div class="form-group"><label>Картинка курса</label><div class="td-sub">Берётся из папки <code>static/course_images</code> по названию курса.</div></div>
       <div class="form-group"><label>Макс. студентов</label><input type="number" name="max_students" id="ef_max" min="1"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-ghost" onclick="closeModal('editModal')">Отмена</button>
