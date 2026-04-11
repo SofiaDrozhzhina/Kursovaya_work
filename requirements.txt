@@ -4,3 +4,5 @@ werkzeug>=3.0.0
 python-docx
 reportlab
 openpyxl
+Pillow
+pytest
